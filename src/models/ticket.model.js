@@ -31,7 +31,6 @@ const ticketSchema = new mongoose.Schema({
     },
     priorityLevel:{
         type: Number,
-        required: true
     },
     type:{
         type: String,

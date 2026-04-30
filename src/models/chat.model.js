@@ -6,11 +6,12 @@ const chatSchema = new mongoose.Schema({
         ref: 'chatBot',
         required: true
     },
-    userId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'user',
-        required: true
+    name: {
+        type: String,
     },
+    email: {
+        type: String,
+    }
 }, { timestamps: true });
 
 const chatModel = mongoose.model('chat', chatSchema);

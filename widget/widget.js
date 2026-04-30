@@ -46,13 +46,6 @@
     h = h.replace(/^\s*[-*]\s+(.*)$/gm, "<li>$1</li>");
     if (h.includes("<li>")) h = h.replace(/(<li>.*<\/li>+)/s, "<ul>$1</ul>");
 
-    // Detect Inquiry Form Token
-    if (h.includes("[FORM:INQUIRY_BASIC]")) {
-      h = h.replace("[FORM:INQUIRY_BASIC]", `<div class="inquiry-form-container" data-type="basic"></div>`);
-    } else if (h.includes("[FORM:INQUIRY]")) {
-      h = h.replace("[FORM:INQUIRY]", `<div class="inquiry-form-container" data-type="full"></div>`);
-    }
-
     return h;
   }
 
@@ -317,75 +310,6 @@
       .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
       .powered-by { text-align: center; font-size: 10.5px; margin-top: 8px; opacity: 0.4; }
 
-      /* Inquiry Form Styles */
-      .inquiry-form {
-        margin-top: 12px;
-        background: rgba(255, 255, 255, 0.7);
-        border: 1px solid ${pBase}22;
-        border-radius: 12px;
-        padding: 14px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-      }
-      .inquiry-form.submitted {
-        background: ${pBase}08;
-        border-color: #4ade80;
-        text-align: center;
-        padding: 20px;
-      }
-      .inquiry-field {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .inquiry-field label {
-        font-size: 11px;
-        font-weight: 600;
-        color: ${textColor};
-        opacity: 0.6;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-      .inquiry-field input {
-        padding: 8px 12px;
-        border: 1.5px solid rgba(0,0,0,0.08);
-        border-radius: 8px;
-        font-size: 13px;
-        outline: none;
-        background: #fff;
-        color: ${textColor};
-        transition: border-color 0.2s;
-      }
-      .inquiry-field input:focus {
-        border-color: ${primary};
-      }
-      .inquiry-submit {
-        margin-top: 4px;
-        padding: 10px;
-        background: ${primary};
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-      }
-      .inquiry-submit:hover {
-        background: ${secondary};
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px ${pBase}33;
-      }
-      .inquiry-submit:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      .success-icon {
-        color: #4ade80;
-        margin-bottom: 8px;
-      }
     `;
   }
 
@@ -553,117 +477,10 @@
     if (!elBody) return;
     elBody.innerHTML = buildMessagesHTML();
 
-    // Scan for and initialize inquiry forms
-    const containers = elBody.querySelectorAll('.inquiry-form-container');
-    containers.forEach((container, idx) => {
-      // If it's already rendered, skip
-      if (container.dataset.rendered) return;
-      renderInquiryForm(container, idx, container.dataset.type || 'full');
-    });
 
     elBody.scrollTop = elBody.scrollHeight;
   }
 
-  function renderInquiryForm(container, id, type = 'full') {
-    container.dataset.rendered = "true";
-    const isFull = type === 'full';
-
-    container.innerHTML = `
-      <form class="inquiry-form" id="form-inquiry-${id}">
-        <div class="inquiry-field">
-          <label>Full Name</label>
-          <input type="text" name="name" placeholder="Enter your name" required />
-        </div>
-        <div class="inquiry-field">
-          <label>Email Address</label>
-          <input type="email" name="email" placeholder="email@example.com" />
-        </div>
-        <div class="inquiry-field">
-          <label>Phone Number</label>
-          <input type="tel" name="phone" placeholder="+1..." />
-        </div>
-        ${isFull ? `
-        <div class="inquiry-field">
-          <label>What are you looking for?</label>
-          <textarea name="summary" placeholder="Briefly describe your needs..." required 
-            style="padding: 8px 12px; border: 1.5px solid rgba(0,0,0,0.08); border-radius: 8px; font-size: 13px; outline: none; background: #fff; color: ${textColor}; min-height: 60px; resize: vertical;"></textarea>
-        </div>` : ''}
-        <button type="submit" class="inquiry-submit">Submit Details</button>
-        <div class="error-msg" style="display:none; color: #ff4444; font-size: 11px; margin-top: 4px; text-align: center;">Email or Phone is required</div>
-      </form>
-    `;
-
-    const form = container.querySelector('form');
-    const errEl = form.querySelector('.error-msg');
-
-    form.onsubmit = async (e) => {
-      e.preventDefault();
-      const email = form.querySelector('[name="email"]').value.trim();
-      const phone = form.querySelector('[name="phone"]').value.trim();
-
-      if (!email && !phone) {
-        errEl.style.display = 'block';
-        return;
-      }
-      errEl.style.display = 'none';
-
-      const submitBtn = form.querySelector('button');
-      submitBtn.disabled = true;
-      submitBtn.innerText = "Submitting...";
-
-      const formData = new FormData(form);
-
-      // Build the inquiry summary
-      let inquirySummary = "";
-      if (isFull) {
-        inquirySummary = formData.get('summary');
-      } else {
-        // Context-based summary from history
-        const userMessages = history.filter(m => m.role === 'user').slice(-3);
-        inquirySummary = userMessages.length > 0
-          ? userMessages.map(m => m.content).join(" | ")
-          : "Contextual Inquiry from chat";
-      }
-
-      const data = {
-        name: formData.get('name'),
-        email: email || "",
-        phone: phone || "",
-        chatbotId: chatbotId,
-        userId: config.userId,
-        inquiry: inquirySummary
-      };
-
-      try {
-        const res = await fetch(`${backendOrigin}/api/inquiry/create-from-widget`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-        const json = await res.json();
-
-        if (json.success) {
-          container.innerHTML = `
-                    <div class="inquiry-form submitted">
-                        <div class="success-icon">
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                        </div>
-                        <div style="font-weight: 700; font-size: 15px; color: ${textColor};">Details Received!</div>
-                        <div style="font-size: 12px; opacity: 0.6; margin-top: 4px;">An agent will be in touch soon.</div>
-                    </div>
-                `;
-          // Send a hidden message to AI to acknowledge the submission
-          sendMessage(`[SYSTEM: FORM_SUBMITTED] My name is ${data.name}. Please acknowledge my submission and continue helping me.`, true);
-        } else {
-          throw new Error(json.message);
-        }
-      } catch (err) {
-        submitBtn.disabled = false;
-        submitBtn.innerText = "Error - Try Again";
-        console.error("Inquiry error:", err);
-      }
-    };
-  }
 
   // ── Send Message ──────────────────────────────────────────────────────────
   async function sendMessage(text, isHidden = false) {
