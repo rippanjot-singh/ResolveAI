@@ -24,16 +24,22 @@ const model = new ChatGoogleGenerativeAI({
     maxOutputTokens: 2048,
 });
 
-const model2 = new ChatMistralAI({
+const mistralModel = new ChatMistralAI({
     apiKey: config.MISTRAL_API_KEY,
     model: "mistral-large-latest",
     maxOutputTokens: 2048,
 });
 
-const modelWithTools = model.bindTools([
+const mistralSmall = new ChatMistralAI({
+    apiKey: config.MISTRAL_API_KEY,
+    model: "mistral-small-latest",
+    maxOutputTokens: 50,
+});
+
+const modelWithTools = mistralModel.bindTools([
     createTicketTool
 ]);
 
 
-module.exports = { modelWithTools };
+module.exports = { modelWithTools, mistralModel, mistralSmall };
 

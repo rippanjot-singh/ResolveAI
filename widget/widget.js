@@ -15,6 +15,7 @@
   let isLoading = false;
   let config = null;
   let shadow = null; // set once in init()
+  let chatId = null;
 
   // ── Style State (populated after config loads) ───────────────────────────
   let primary = '#158effff';
@@ -23,7 +24,10 @@
   let secondary = '#003ba8ff';
 
   const HISTORY_KEY = `resolveai_history_${chatbotId}`;
+  const CHAT_ID_KEY = `resolveai_chat_id_${chatbotId}`;
+  
   try { const s = localStorage.getItem(HISTORY_KEY); if (s) history = JSON.parse(s); } catch (e) { }
+  try { chatId = localStorage.getItem(CHAT_ID_KEY); } catch (e) { }
 
   // ── Config helpers ────────────────────────────────────────────────────────
   function c(path, fallback) {
@@ -90,6 +94,26 @@
         </div>`;
     }
     return html;
+  }
+
+  function buildIdentityFormHTML() {
+    return `
+      <div class="identity-form" id="sb-identity-form-container">
+        <div class="identity-title">Welcome!</div>
+        <div class="identity-subtitle">Please introduce yourself to start chatting.</div>
+        <form id="sb-identity-form">
+          <div class="field">
+            <label>Name</label>
+            <input type="text" name="name" placeholder="Your Name" required />
+          </div>
+          <div class="field" style="margin-top: 12px;">
+            <label>Email</label>
+            <input type="email" name="email" placeholder="email@example.com" required />
+          </div>
+          <button type="submit" class="identity-submit" id="sb-identity-submit">Start Chatting</button>
+        </form>
+      </div>
+    `;
   }
 
   // ── SVG Icons ─────────────────────────────────────────────────────────────
@@ -310,6 +334,68 @@
       .send-btn:disabled { opacity: 0.3; cursor: not-allowed; }
       .powered-by { text-align: center; font-size: 10.5px; margin-top: 8px; opacity: 0.4; }
 
+      /* Identity Form Styles */
+      .identity-form {
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        background: ${bgColor};
+        height: 100%;
+        justify-content: center;
+      }
+      .identity-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: ${textColor};
+      }
+      .identity-subtitle {
+        font-size: 13px;
+        opacity: 0.6;
+        margin-bottom: 16px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .field label {
+        font-size: 12px;
+        font-weight: 600;
+        opacity: 0.8;
+      }
+      .field input {
+        padding: 10px 14px;
+        border: 1.5px solid rgba(0,0,0,0.1);
+        border-radius: 10px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      .field input:focus {
+        border-color: ${primary};
+      }
+      .identity-submit {
+        margin-top: 10px;
+        padding: 12px;
+        background: ${primary};
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .identity-submit:hover {
+        background: ${secondary};
+        transform: translateY(-1px);
+      }
+      .identity-submit:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
     `;
   }
 
@@ -475,8 +561,54 @@
   // ── refreshMessages — updates ONLY the body, no window rebuild ────────────
   function refreshMessages() {
     if (!elBody) return;
-    elBody.innerHTML = buildMessagesHTML();
 
+    if (!chatId) {
+      elBody.innerHTML = buildIdentityFormHTML();
+      const footer = shadow.getElementById('sb-footer');
+      if (footer) footer.style.display = 'none';
+
+      const form = shadow.getElementById('sb-identity-form');
+      if (form) {
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          const btn = shadow.getElementById('sb-identity-submit');
+          btn.disabled = true;
+          btn.innerText = "Initializing...";
+
+          const fd = new FormData(form);
+          const data = {
+            name: fd.get('name'),
+            email: fd.get('email'),
+            chatbotId
+          };
+
+          try {
+            const res = await fetch(`${backendOrigin}/api/chat/init`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            if (json.success) {
+              chatId = json.data.chatId;
+              localStorage.setItem(CHAT_ID_KEY, chatId);
+              if (footer) footer.style.display = '';
+              refreshMessages();
+            } else {
+              throw new Error(json.message);
+            }
+          } catch (err) {
+            btn.disabled = false;
+            btn.innerText = "Error - Try Again";
+            console.error("Init chat error:", err);
+          }
+        };
+      }
+    } else {
+      elBody.innerHTML = buildMessagesHTML();
+      const footer = shadow.getElementById('sb-footer');
+      if (footer && !isMinimized) footer.style.display = '';
+    }
 
     elBody.scrollTop = elBody.scrollHeight;
   }
@@ -510,7 +642,7 @@
       const res = await fetch(`${backendOrigin}/api/ai/ask/${chatbotId}?currentUrl=${currentUrl}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text, history: history.slice(0, -1) })
+        body: JSON.stringify({ question: text, history: history.slice(0, -1), chatId })
       });
       const json = await res.json();
       history.push({

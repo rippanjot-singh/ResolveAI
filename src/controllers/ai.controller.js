@@ -1,14 +1,22 @@
-const { modelWithTools } = require('../services/ai.service');
 const allTools = require('../tools/ai.tools');
 const { SystemMessage, ToolMessage, HumanMessage, AIMessage } = require("@langchain/core/messages");
 const chatBotModel = require('../models/chatbot.model');
+const chatModel = require('../models/chat.model');
+const { recordInteraction } = require('../utils/interaction.utils');
+
+const { modelWithTools } = require('../services/ai.service');
 
 const { isDomainVerified } = require('../utils/domain.utils');
 
 async function askAI(req, res) {
     try {
-        const { question, history = [] } = req.body;
+        const { question, history = [], chatId } = req.body;
         const chatbotId = req.params.id;
+        
+        let chat = null;
+        if (chatId) {
+            chat = await chatModel.findById(chatId);
+        }
 
         if (!chatbotId) {
             return res.status(400).json({ success: false, message: 'Chatbot ID is required' });
@@ -28,12 +36,12 @@ async function askAI(req, res) {
             return res.status(403).json({ success: false, message: "Chatbot is currently inactive." });
         }
 
-        // 1. Map history from client to LangChain message formats
         const historyMessages = history.map(msg => 
           msg.role === "user" ? new HumanMessage(msg.content) : new AIMessage(msg.content)
         );
 
         const systemPrompt = `You are a professional assistant.\n\n` +
+                (chat ? `Talking to "${chat.name}" whose email is ${chat.email}\n\n` : '') +
                 `Identity: Your name is "${chatBot.name}".\n` +
                 `Context: chatbotId="${chatbotId}", userId="${chatBot.userId}".\n` +
                 `Instructions: ${chatBot.prompt || 'Help the user with their queries.'}\n\n` +
@@ -44,7 +52,6 @@ async function askAI(req, res) {
                 `1. CONSULTATIVE APPROACH:\n` +
                 `   - Provide deep-level value and expertise in your responses.\n` +
                 `   - When appropriate, suggest creating a support ticket using the available tools to ensure the team can follow up with more specific information.\n\n` +
-
                 `2. STRICT NEGATIVE CONSTRAINTS (ZERO TOLERANCE):\n` +
                 `   - NO HALLUCINATION: If information is not in the provided context, DO NOT INVENT IT. Instead, suggest creating a ticket for a specialist to review: "That's a specialized detail our team manages directly. Let's get a ticket started so they can provide that specific information for you."\n` +
                 `   - NO FAKE DATA: FORBIDDEN from assuming any user name. Address the user professionally until their name is confirmed.\n` +
@@ -113,6 +120,17 @@ async function askAI(req, res) {
             data: response.content
         });
 
+        // Background: Interaction recording (moved to service)
+        if (chatId) {
+            recordInteraction({
+                chatbotId,
+                chatId,
+                userId: chatBot.userId,
+                question,
+                answer: response.content
+            });
+        }
+
     } catch (error) {
         console.error("AI Controller Error:", error);
         res.status(500).json({
@@ -124,5 +142,3 @@ async function askAI(req, res) {
 }
 
 module.exports = { askAI };
-
-
