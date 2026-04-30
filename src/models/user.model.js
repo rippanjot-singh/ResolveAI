@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
+    companyName: {
+        type: String,
+        required: true,
+    },
     name: {
         type: String,
         required: true,
@@ -23,7 +27,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: ['member', 'admin'],
-        default: 'member',
+        default: 'admin',
     },
     notionTokens: {
         access_token: String,
@@ -39,11 +43,10 @@ const userSchema = new mongoose.Schema({
     },
     isSolviingTickets: {
         type: Boolean,
-        default: false,
+        default: true,
     },
     speciality: {
         type: String,
-        required: true,
     }
 }, { timestamps: true });
 

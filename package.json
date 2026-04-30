@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
@@ -13,11 +13,16 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@langchain/google-genai": "^2.1.29",
+    "@langchain/mistralai": "^1.0.8",
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.6.0"
+    "mongoose": "^9.6.0",
+    "zod": "^4.4.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

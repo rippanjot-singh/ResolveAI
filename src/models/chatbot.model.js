@@ -12,6 +12,7 @@ const chatBotSchema = new mongoose.Schema({
     },
     description: {
         type: String,
+        default: ''
     },
     prompt: {
         type: String,

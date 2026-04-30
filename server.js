@@ -1,6 +1,6 @@
-import app from "./src/app.js";
-import config from "./src/config/config.js";
-import connectDB from "./src/config/db.js";
+const app = require("./src/app.js");
+const config = require("./src/config/config.js");
+const connectDB = require("./src/config/db.js");
 
 connectDB();
 
