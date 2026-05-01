@@ -127,7 +127,7 @@ async function updateTicketController(req, res) {
 async function resolveTicketController(req, res) {
     try {
         const { ticketId } = req.params;
-        const { response, subject, text, html } = req.body;
+        const { subject, html, response } = req.body;
         const { userId } = req.user;
         const user = await userModel.findById(userId);
 
@@ -139,17 +139,21 @@ async function resolveTicketController(req, res) {
             });
         }
 
-        await sendMail(ticket.email, subject, text, html);
+        const replyContent = html || response;
+
+        // sendMail signature: to, subject, text, html
+        // passing plain text version as 3rd arg, HTML as 4th arg
+        await sendMail(ticket.email, subject, replyContent, replyContent);
 
         const updatedTicket = await ticketModel.findByIdAndUpdate(
             ticketId,
             {
-                $set: { status: "closed", response }
+                $set: { status: "closed", response: replyContent }
             },
             { new: true, runValidators: true }
         );
 
-        chatRag(ticket.inquiree, text, user.companyId)
+        chatRag(ticket.inquiree, replyContent, user.companyId)
 
 
         return res.status(200).json({
