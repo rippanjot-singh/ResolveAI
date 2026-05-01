@@ -9,11 +9,6 @@ const formResultsSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-    givenTo: {
-        type: String,
-        enum: ['ai', 'human'],
-        required: true
-    },
     answerGiven: {
         type: String
     }

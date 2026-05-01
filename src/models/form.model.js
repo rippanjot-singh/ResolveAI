@@ -5,10 +5,10 @@ const formSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    formId: {
-        type: String,
+    fields: {
+        type: [Object],
         required: true
-    },
+    }
 }, { timestamps: true });
 
 const formModel = mongoose.model('form', formSchema);

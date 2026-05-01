@@ -1,5 +1,6 @@
 const chatModel = require('../models/chat.model');
 const chatBotModel = require('../models/chatbot.model');
+const ticketModel = require('../models/ticket.model');
 
 async function initChat(req, res) {
     try {
@@ -33,4 +34,43 @@ async function initChat(req, res) {
     }
 }
 
-module.exports = { initChat };
+async function createPublicTicket(req, res) {
+    try {
+        const { name, email, inquiree, chatId } = req.body;
+
+        if (!email || !inquiree) {
+            return res.status(400).json({ success: false, message: "Email and inquiree are required" });
+        }
+
+        const ticket = await ticketModel.create({
+            name,
+            email,
+            inquiree,
+            chatId,
+            status: 'open',
+            priority: 'medium',
+            type: 'chatbot'
+        });
+
+        // Update chat session with user identity from the form
+        if (chatId) {
+            await chatModel.findByIdAndUpdate(chatId, {
+                $set: { 
+                    ...(name && { name }), 
+                    ...(email && { email }) 
+                }
+            });
+        }
+
+        res.status(201).json({
+            success: true,
+            message: "Ticket created successfully",
+            data: ticket
+        });
+    } catch (error) {
+        console.error("Public Ticket Error:", error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+module.exports = { initChat, createPublicTicket };

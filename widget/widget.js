@@ -50,6 +50,30 @@
     h = h.replace(/^\s*[-*]\s+(.*)$/gm, "<li>$1</li>");
     if (h.includes("<li>")) h = h.replace(/(<li>.*<\/li>+)/s, "<ul>$1</ul>");
 
+    if (h.includes("RENDER_TICKET_FORM_MARKER")) {
+      let prefill = {};
+      try {
+        const parts = h.split("RENDER_TICKET_FORM_MARKER|");
+        if (parts.length > 1) {
+          const jsonStr = parts[1].split("<")[0].trim();
+          prefill = JSON.parse(jsonStr);
+          h = h.replace(`RENDER_TICKET_FORM_MARKER|${jsonStr}`, "RENDER_TICKET_FORM_MARKER");
+        }
+      } catch (e) { console.error("Prefill parse error:", e); }
+
+      h = h.replace("RENDER_TICKET_FORM_MARKER", `
+        <div class="bubble-form" id="sb-ticket-form">
+          <div style="font-weight:600; margin-bottom:8px; font-size:12px;">Inquiry Form</div>
+          <input type="text" id="sb-ticket-name" placeholder="Full Name" />
+          <input type="email" id="sb-ticket-email" placeholder="Email Address" required />
+          <textarea id="sb-ticket-inquiree" placeholder="What's your inquiry?" style="padding:8px; border:1px solid rgba(0,0,0,0.1); border-radius:4px; font-size:13px; min-height:60px; ${prefill.inquiree ? 'display:none;' : ''}">${prefill.inquiree || ''}</textarea>
+          ${prefill.inquiree ? `<div style="font-size:12px; opacity:0.8; margin-bottom:8px;">Inquiry: <i>${prefill.inquiree}</i></div>` : ''}
+          <button type="button" id="sb-ticket-submit">Submit Inquiry</button>
+          <div id="sb-ticket-status" style="font-size:11px; margin-top:4px; display:none;"></div>
+        </div>
+      `);
+    }
+
     return h;
   }
 
@@ -104,13 +128,14 @@
         <form id="sb-identity-form">
           <div class="field">
             <label>Name</label>
-            <input type="text" name="name" placeholder="Your Name" required />
+            <input type="text" name="name" placeholder="Your Name" />
           </div>
           <div class="field" style="margin-top: 12px;">
             <label>Email</label>
-            <input type="email" name="email" placeholder="email@example.com" required />
+            <input type="email" name="email" placeholder="email@example.com" />
           </div>
           <button type="submit" class="identity-submit" id="sb-identity-submit">Start Chatting</button>
+          <button type="button" class="identity-skip" id="sb-identity-skip">Skip and start chatting</button>
         </form>
       </div>
     `;
@@ -396,6 +421,42 @@
         opacity: 0.6;
         cursor: not-allowed;
       }
+      .identity-skip {
+        margin-top: 8px;
+        background: transparent;
+        color: ${textColor};
+        opacity: 0.6;
+        border: none;
+        font-size: 12px;
+        cursor: pointer;
+        text-decoration: underline;
+        width: 100%;
+        text-align: center;
+      }
+      .bubble-form {
+        margin-top: 10px;
+        padding: 12px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .bubble-form input {
+        padding: 8px;
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 4px;
+        font-size: 13px;
+      }
+      .bubble-form button {
+        padding: 8px;
+        background: ${primary};
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
     `;
   }
 
@@ -524,6 +585,49 @@
     elInput.addEventListener('keydown', (e) => {
       e.stopPropagation(); // prevent host shortcuts (e.g. search bars, hotkeys)
     });
+
+    // 4. Ticket form delegation
+    elBody.addEventListener('click', async (e) => {
+      const btn = e.target.closest('#sb-ticket-submit');
+      if (!btn) return;
+
+      const container = btn.closest('#sb-ticket-form');
+      const name = container.querySelector('#sb-ticket-name').value;
+      const email = container.querySelector('#sb-ticket-email').value;
+      const inquiree = container.querySelector('#sb-ticket-inquiree').value;
+      const status = container.querySelector('#sb-ticket-status');
+
+      if (!email || !inquiree) {
+        status.innerText = "Email and inquiry are required.";
+        status.style.display = 'block';
+        status.style.color = 'red';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Submitting...";
+      status.style.display = 'none';
+
+      try {
+        const res = await fetch(`${backendOrigin}/api/chat/ticket`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, inquiree, chatId })
+        });
+        const json = await res.json();
+        if (json.success) {
+          container.innerHTML = `<div style="color: ${primary}; font-weight: 600; font-size: 13px;">✓ Inquiry sent successfully! Our team will reach out soon.</div>`;
+        } else {
+          throw new Error(json.message);
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = "Submit Inquiry";
+        status.innerText = "Failed to submit. Try again.";
+        status.style.display = 'block';
+        status.style.color = 'red';
+      }
+    });
   }
 
   function updateMinBtn() {
@@ -569,19 +673,7 @@
 
       const form = shadow.getElementById('sb-identity-form');
       if (form) {
-        form.onsubmit = async (e) => {
-          e.preventDefault();
-          const btn = shadow.getElementById('sb-identity-submit');
-          btn.disabled = true;
-          btn.innerText = "Initializing...";
-
-          const fd = new FormData(form);
-          const data = {
-            name: fd.get('name'),
-            email: fd.get('email'),
-            chatbotId
-          };
-
+        const initChatHandler = async (data) => {
           try {
             const res = await fetch(`${backendOrigin}/api/chat/init`, {
               method: 'POST',
@@ -598,11 +690,41 @@
               throw new Error(json.message);
             }
           } catch (err) {
+            console.error("Init chat error:", err);
+            return false;
+          }
+          return true;
+        };
+
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          const btn = shadow.getElementById('sb-identity-submit');
+          btn.disabled = true;
+          const oldText = btn.innerText;
+          btn.innerText = "Initializing...";
+
+          const fd = new FormData(form);
+          const data = {
+            name: fd.get('name'),
+            email: fd.get('email'),
+            chatbotId
+          };
+
+          const ok = await initChatHandler(data);
+          if (!ok) {
             btn.disabled = false;
             btn.innerText = "Error - Try Again";
-            console.error("Init chat error:", err);
           }
         };
+
+        const skipBtn = shadow.getElementById('sb-identity-skip');
+        if (skipBtn) {
+          skipBtn.onclick = async () => {
+            skipBtn.innerText = "Starting...";
+            skipBtn.disabled = true;
+            await initChatHandler({ name: "Guest", email: "", chatbotId });
+          };
+        }
       }
     } else {
       elBody.innerHTML = buildMessagesHTML();

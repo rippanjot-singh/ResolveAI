@@ -49,16 +49,21 @@ async function askAI(req, res) {
                 `## IDENTITY & MISSION\n` +
                 `You are "${chatBot.name}". Your primary purpose is to help users and address their queries effectively. You should demonstrate expertise and build trust.\n\n` +
                 `## CORE OPERATING PROTOCOLS\n` +
-                `1. CONSULTATIVE APPROACH:\n` +
-                `   - Provide deep-level value and expertise in your responses.\n` +
-                `   - When appropriate, suggest creating a support ticket using the available tools to ensure the team can follow up with more specific information.\n\n` +
-                `2. STRICT NEGATIVE CONSTRAINTS (ZERO TOLERANCE):\n` +
-                `   - NO HALLUCINATION: If information is not in the provided context, DO NOT INVENT IT. Instead, suggest creating a ticket for a specialist to review: "That's a specialized detail our team manages directly. Let's get a ticket started so they can provide that specific information for you."\n` +
-                `   - NO FAKE DATA: FORBIDDEN from assuming any user name. Address the user professionally until their name is confirmed.\n` +
-                `   - NO PREMATURE RECORDING: You have NO ability to save data yourself except via the provided tools. Never say "I've recorded your interest" unless a tool call was successful.\n\n` +
-                `3. TICKET CREATION ACKNOWLEDGEMENT:\n` +
-                `   - Once a ticket is created via a tool, confirm it to the user. "Fantastic! I've created a ticket for you. Our team has been notified and will reach out to you shortly."\n` +
-                `   - Transition back to helping them with any other queries.`;
+                `1. CONCISE COMMUNICATION (STRICT):\n` +
+                `   - Keep responses extremely short and direct.\n` +
+                `   - NEVER ask more than one question at a time. Only ask what is absolutely necessary.\n\n` +
+                `2. NO PRODUCT HALLUCINATION (STRICT):\n` +
+                `   - FORBIDDEN from inventing product/course details (price, duration, curriculum, etc.) if not in context.\n` +
+                `   - If missing info, say: "I don't have the specific details for that. Would you like me to create a ticket for the team to assist you?" and then use the form tool.\n\n` +
+                `3. STRICT NEGATIVE CONSTRAINTS:\n` +
+                `   - NO FAKE EMAILS: Never guess user emails. Use \`showTicketForm\` for Guests.\n` +
+                `   - NO HALLUCINATION: Do not invent facts.\n` +
+                `   - NO RAW TOOLS: NEVER write tool names or JSON like \`showTicketForm{...}\` in your text. Tools must be called silently.\n\n` +
+                `4. FORMS & TICKETS:\n` +
+                `   - Call \`showTicketForm\` if missing user details or if a follow-up is needed.\n` +
+                `   - Your response MUST contain: RENDER_TICKET_FORM_MARKER when calling \`showTicketForm\`.\n\n` +
+                `5. ACKNOWLEDGEMENT:\n` +
+                `   - "I've created a ticket for you. Our team will reach out shortly."`;
 
         const messages = [
             new SystemMessage(systemPrompt),
@@ -78,11 +83,13 @@ async function askAI(req, res) {
 
 
         // Dynamic Tool Execution Loop
+        const toolCallHistory = [];
         if (response.tool_calls && response.tool_calls.length > 0) {
             console.log(`Tool calls detected: ${response.tool_calls.length}`);
             const toolResults = [];
 
             for (const toolCall of response.tool_calls) {
+                toolCallHistory.push(toolCall);
                 const toolToExecute = allTools[toolCall.name];
 
                 if (toolToExecute) {
@@ -110,14 +117,27 @@ async function askAI(req, res) {
                     timeoutPromise(30000)
                 ]);
                 console.log("Final response received.");
+                
+                // Safety: If showTicketForm was called but marker is missing, append it
+                const formCalled = toolCallHistory.some(tc => tc.name === 'showTicketForm');
+                if (formCalled && !finalResponse.content.includes('RENDER_TICKET_FORM_MARKER')) {
+                    finalResponse.content += '\n\nRENDER_TICKET_FORM_MARKER';
+                }
+
                 response = finalResponse;
             }
         }
 
+        // Final Cleanup: Remove any leaked tool names or JSON blocks from the content
+        let finalContent = response.content || "";
+        finalContent = finalContent.replace(/showTicketForm\{.*?\}/g, "");
+        finalContent = finalContent.replace(/createTicketTool\{.*?\}/g, "");
+        finalContent = finalContent.trim();
+
         res.status(200).json({
             success: true,
             message: "Response from AI",
-            data: response.content
+            data: finalContent
         });
 
         // Background: Interaction recording (moved to service)
