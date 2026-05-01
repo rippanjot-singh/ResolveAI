@@ -146,5 +146,6 @@ async function getReleventdata(url) {
 module.exports = {
     rag,
     getReleventdata,
-    chatRag
+    chatRag,
+    getReleventMessages
 }

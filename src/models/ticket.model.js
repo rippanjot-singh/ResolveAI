@@ -32,10 +32,13 @@ const ticketSchema = new mongoose.Schema({
     priorityLevel:{
         type: Number,
     },
-    type:{
+    type: {
         type: String,
         enum: ['chatbot', 'form', 'email', 'other'],
         default: 'chatbot'
+    },
+    response: {
+        type: String,
     }
 }, { timestamps: true });
 

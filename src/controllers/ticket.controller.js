@@ -1,13 +1,15 @@
 const userModel = require("../models/user.model");
 const ticketModel = require("../models/ticket.model");
 const { updateTicketSchema } = require("../validators/ticket.validator");
+const sendMail = require("../services/email.service");
+const { chatRag } = require("../services/rag.service");
 
-async function createTicketController(req, res){
+async function createTicketController(req, res) {
     try {
-        const {userId} = req.user;
+        const { userId } = req.user;
         const { name, email, inquiree, assignedTo, priority, priorityLevel } = req.body;
 
-        const user = await userModel.findOne({_id: userId});
+        const user = await userModel.findOne({ _id: userId });
         if (user.role !== 'admin' && assignedTo) {
             return res.status(403).json({
                 message: "Only admin can assign tickets"
@@ -22,7 +24,7 @@ async function createTicketController(req, res){
             priority,
             priorityLevel
         });
-        
+
         return res.status(201).json({
             message: "Ticket created successfully",
             ticket
@@ -36,7 +38,7 @@ async function createTicketController(req, res){
     }
 }
 
-async function getAllTicketsController(req, res){
+async function getAllTicketsController(req, res) {
     try {
         const tickets = await ticketModel.find();
         return res.status(200).json({
@@ -51,9 +53,9 @@ async function getAllTicketsController(req, res){
     }
 }
 
-async function getTicketController(req, res){
+async function getTicketController(req, res) {
     try {
-        const {ticketId} = req.params;
+        const { ticketId } = req.params;
         const ticket = await ticketModel.findById(ticketId);
         return res.status(200).json({
             message: "Ticket fetched successfully",
@@ -67,9 +69,9 @@ async function getTicketController(req, res){
     }
 }
 
-async function deleteTicketController(req, res){
+async function deleteTicketController(req, res) {
     try {
-        const {ticketId} = req.params;
+        const { ticketId } = req.params;
         const ticket = await ticketModel.findByIdAndDelete(ticketId);
         return res.status(200).json({
             message: "Ticket deleted successfully",
@@ -122,10 +124,52 @@ async function updateTicketController(req, res) {
     }
 }
 
+async function resolveTicketController(req, res) {
+    try {
+        const { ticketId } = req.params;
+        const { response, subject, text, html } = req.body;
+        const { userId } = req.user;
+        const user = await userModel.findById(userId);
+
+        const ticket = await ticketModel.findById(ticketId);
+        if (!ticket) {
+            return res.status(404).json({
+                message: "Ticket not found",
+                status: "failed"
+            });
+        }
+
+        await sendMail(ticket.email, subject, text, html);
+
+        const updatedTicket = await ticketModel.findByIdAndUpdate(
+            ticketId,
+            {
+                $set: { status: "closed", response }
+            },
+            { new: true, runValidators: true }
+        );
+
+        chatRag(ticket.inquiree, text, user.companyId)
+
+
+        return res.status(200).json({
+            message: "Ticket resolved successfully",
+            status: "success",
+            updatedTicket
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Internal server error",
+            error: error.message
+        });
+    }
+}
+
 module.exports = {
     createTicketController,
     getAllTicketsController,
     getTicketController,
     deleteTicketController,
-    updateTicketController
+    updateTicketController,
+    resolveTicketController
 };
