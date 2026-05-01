@@ -45,6 +45,10 @@ if (!process.env.SUPPORT_EMAIL) {
     throw new Error("SUPPORT_EMAIL is not defined in environment variables")
 }
 
+if (!process.env.PINECONE_API_KEY) {
+    throw new Error("PINECONE_API_KEY is not defined in environment variables")
+}
+
 
 
 const config = {
@@ -60,7 +64,8 @@ const config = {
     EMAIL_USER: process.env.EMAIL_USER,
     EMAIL_PASS: process.env.EMAIL_PASS,
     SUPPORT_EMAIL: process.env.SUPPORT_EMAIL,
-    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+    PINECONE_API_KEY: process.env.PINECONE_API_KEY
 }
 
 module.exports = config

@@ -2,6 +2,8 @@ const { ChatGoogleGenerativeAI } = require("@langchain/google-genai");
 const { createTicketTool } = require("../tools/ai.tools");
 const config = require("../config/config");
 const { ChatMistralAI } = require("@langchain/mistralai");
+const { MistralAIEmbeddings } = require("@langchain/mistralai");
+
 
 // Monkey patch for @langchain/core/utils/uuid CommonJS compatibility
 try {
@@ -36,10 +38,15 @@ const mistralSmall = new ChatMistralAI({
     maxOutputTokens: 50,
 });
 
+const embeddings = new MistralAIEmbeddings({
+    model: "mistral-embed",
+    apiKey: config.MISTRAL_API_KEY,
+});
+
 const modelWithTools = mistralModel.bindTools([
     createTicketTool
 ]);
 
 
-module.exports = { modelWithTools, mistralModel, mistralSmall };
+module.exports = { modelWithTools, mistralModel, mistralSmall, embeddings };
 
