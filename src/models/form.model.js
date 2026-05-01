@@ -1,16 +1,34 @@
 const mongoose = require('mongoose');
 
 const formSchema = new mongoose.Schema({
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'user',
+        required: true
+    },
     name: {
         type: String,
         required: true
     },
-    fields: {
-        type: [Object],
-        required: true
+    description: String,
+    fields: [{
+        label: String,
+        name: String,
+        type: {
+            type: String,
+            enum: ['text', 'email', 'number', 'textarea', 'select', 'checkbox'],
+            default: 'text'
+        },
+        required: {
+            type: Boolean,
+            default: false
+        },
+        options: [String] // For select/checkbox
+    }],
+    isActive: {
+        type: Boolean,
+        default: true
     }
 }, { timestamps: true });
 
-const formModel = mongoose.model('form', formSchema);
-
-module.exports = formModel;
+module.exports = mongoose.model('Form', formSchema);

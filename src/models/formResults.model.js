@@ -1,19 +1,25 @@
 const mongoose = require('mongoose');
 
-const formResultsSchema = new mongoose.Schema({
+const formResultSchema = new mongoose.Schema({
     formId: {
-        type: String,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Form',
         required: true
     },
-    isResolved: {
-        type: Boolean,
-        default: false
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'user',
+        required: true
     },
-    answerGiven: {
-        type: String
+    data: {
+        type: mongoose.Schema.Types.Mixed,
+        required: true
+    },
+    metadata: {
+        ip: String,
+        userAgent: String,
+        referrer: String
     }
 }, { timestamps: true });
 
-const formResultsModel = mongoose.model('formResults', formResultsSchema);
-
-module.exports = formResultsModel;
+module.exports = mongoose.model('FormResult', formResultSchema);

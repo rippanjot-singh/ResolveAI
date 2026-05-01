@@ -6,6 +6,7 @@ const aiRoutes = require('./routes/ai.routes.js');
 const chatbotRoutes = require('./routes/chatbot.routes.js');
 const ticketRoutes = require('./routes/ticket.routes.js');
 const chatRoutes = require('./routes/chat.routes.js');
+const formRoutes = require('./routes/form.routes.js');
 const path = require('path');
 
 const app = express();
@@ -34,5 +35,6 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/ticket', ticketRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/form', formRoutes);
 
 module.exports = app;

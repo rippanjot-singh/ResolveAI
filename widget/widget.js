@@ -96,11 +96,11 @@
         </div>`;
     }
 
-    history.forEach(msg => {
+    history.forEach((msg, idx) => {
       const isUser = msg.role === 'user';
       const st = isUser ? (senderType === 'text' ? 'style-text' : '') : (replyType === 'text' ? 'style-text' : '');
       html += `
-        <div class="msg-row ${isUser ? 'user' : 'bot'} ${st}">
+        <div class="msg-row ${isUser ? 'user' : 'bot'} ${st}" data-idx="${idx}">
           <div class="msg-wrap">
             <div class="msg-avatar">${isUser ? icons.user : icons.bot}</div>
             <div class="bubble">${formatMarkdown(msg.content)}</div>
@@ -616,7 +616,19 @@
         });
         const json = await res.json();
         if (json.success) {
-          container.innerHTML = `<div style="color: ${primary}; font-weight: 600; font-size: 13px;">✓ Inquiry sent successfully! Our team will reach out soon.</div>`;
+          const successMsg = `<div style="color: ${primary}; font-weight: 600; font-size: 13px;">✓ Inquiry sent successfully! Our team will reach out soon.</div>`;
+          container.innerHTML = successMsg;
+
+          // PERSISTENCE: Update history so it doesn't show the form on reload
+          const row = container.closest('.msg-row');
+          if (row) {
+            const idx = parseInt(row.getAttribute('data-idx'));
+            if (!isNaN(idx) && history[idx]) {
+              // Replace the marker (and prefill data if any) with the success message
+              history[idx].content = history[idx].content.replace(/RENDER_TICKET_FORM_MARKER(\|{.*?})?/, successMsg);
+              saveHistory();
+            }
+          }
         } else {
           throw new Error(json.message);
         }
