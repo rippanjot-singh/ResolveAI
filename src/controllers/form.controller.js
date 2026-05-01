@@ -31,6 +31,10 @@ async function submitPublicForm(req, res) {
             }
         });
 
+        // Background: Process submission with AI (don't await to avoid blocking response)
+        const { processFormSubmission } = require('../utils/formAi.utils');
+        processFormSubmission(form, result).catch(err => console.error("Form AI processing failed:", err));
+
         // If it's a standard form submission (not AJAX), redirect back to the referrer
         const referrer = req.get('Referrer');
         if (referrer && !req.xhr && req.headers.accept?.includes('text/html')) {

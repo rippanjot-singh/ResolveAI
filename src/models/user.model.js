@@ -47,15 +47,29 @@ const userSchema = new mongoose.Schema({
     },
     speciality: {
         type: String,
+    },
+    emailSettings: {
+        Host: String,
+        Port: String,
+        User: String,
+        Pass: String,
+        SupportEmail: String
     }
 }, { timestamps: true });
 
 userSchema.pre('save', async function () {
-    if (!this.isModified('password')) {
-        return;
+    if (this.isModified('password')) {
+        const hash = await bcrypt.hash(this.password, 10);
+        this.password = hash;
     }
-    const hash = await bcrypt.hash(this.password, 10);
-    this.password = hash;
+
+    if (this.isModified('emailSettings')) {
+        const { encrypt } = require('../utils/crypto.utils');
+        if (this.emailSettings.Host) this.emailSettings.Host = encrypt(this.emailSettings.Host);
+        if (this.emailSettings.User) this.emailSettings.User = encrypt(this.emailSettings.User);
+        if (this.emailSettings.Pass) this.emailSettings.Pass = encrypt(this.emailSettings.Pass);
+        if (this.emailSettings.SupportEmail) this.emailSettings.SupportEmail = encrypt(this.emailSettings.SupportEmail);
+    }
 
     return;
 })

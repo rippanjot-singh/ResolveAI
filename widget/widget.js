@@ -402,6 +402,7 @@
         border-color: ${primary};
       }
       .identity-submit {
+        width: 100%;
         margin-top: 10px;
         padding: 12px;
         background: ${primary};
