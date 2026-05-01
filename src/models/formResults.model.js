@@ -19,6 +19,11 @@ const formResultSchema = new mongoose.Schema({
         ip: String,
         userAgent: String,
         referrer: String
+    },
+    aiResponse: {
+        resolved: { type: Boolean, default: false },
+        reply: { type: String },
+        resolvedAt: { type: Date }
     }
 }, { timestamps: true });
 

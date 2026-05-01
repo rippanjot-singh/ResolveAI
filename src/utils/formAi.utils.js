@@ -4,6 +4,7 @@ const sendMail = require('../services/email.service');
 const ticketModel = require('../models/ticket.model');
 const userModel = require('../models/user.model');
 const chatBotModel = require('../models/chatbot.model');
+const formResultModel = require('../models/formResults.model');
 
 async function processFormSubmission(form, submission) {
     try {
@@ -39,7 +40,7 @@ ${formData}
 
 STRICT RULES:
 1. ONLY generate an email if you have 100% of the information required to answer the user's specific questions.
-2. If you find yourself needing to use placeholders like "[Insert link]", "[Price]", or if you are missing any specific details mentioned in the inquiry, respond ONLY with "TICKET".
+2. If you find yourself needing to use ANY placeholder text like "[Website Link]", "[App Link]", "[Price]", "[Name]", "[Insert X]", or ANY text inside square brackets [], respond ONLY with "TICKET". This is NON-NEGOTIABLE.
 3. DO NOT ask follow-up questions for business inquiries. However, simple greetings or conversational "how are you" messages should be answered with a friendly, professional response.
 4. If the inquiry is a request for a meeting, a custom quote, a technical troubleshooting, or anything complex, respond ONLY with "TICKET".
 5. NO HALLUCINATION: Do not invent links, prices, or dates.
@@ -60,7 +61,13 @@ TICKET`;
         const aiContent = response.content.trim();
         console.log(`[FormAI] AI Decision: ${aiContent.substring(0, 50)}...`);
 
-        if (aiContent.toUpperCase().includes('TICKET')) {
+        // Code-level guardrail: detect any placeholder patterns the AI may have missed
+        const hasPlaceholders = /\[[^\]]{1,60}\]/.test(aiContent);
+        if (hasPlaceholders) {
+            console.warn(`[FormAI] Placeholder detected in AI response — forcing TICKET.`);
+        }
+
+        if (hasPlaceholders || aiContent.toUpperCase().includes('TICKET')) {
             console.log(`[FormAI] AI requested ticket for form submission ${submission._id}`);
             await ticketModel.create({
                 userId: user._id,
@@ -79,6 +86,11 @@ TICKET`;
                 await sendMail(userEmail, subject, body, body.replace(/\n/g, '<br>'), user.emailSettings);
                 console.log(`[FormAI] Ticket confirmation email sent to ${userEmail}`);
             }
+
+            // Record: AI escalated, not resolved
+            await formResultModel.findByIdAndUpdate(submission._id, {
+                'aiResponse.resolved': false
+            });
         } else if (userEmail) {
             console.log(`[FormAI] Sending AI generated email response to ${userEmail}`);
             const subjectMatch = aiContent.match(/Subject: (.*)/i);
@@ -87,6 +99,13 @@ TICKET`;
 
             await sendMail(userEmail, subject, body, body.replace(/\n/g, '<br>'), user.emailSettings);
             console.log(`[FormAI] Email sent successfully to ${userEmail}`);
+
+            // Record: AI resolved this submission
+            await formResultModel.findByIdAndUpdate(submission._id, {
+                'aiResponse.resolved': true,
+                'aiResponse.reply': body,
+                'aiResponse.resolvedAt': new Date()
+            });
         } else {
             console.warn(`[FormAI] AI generated content but no recipient email found in data.`);
         }
