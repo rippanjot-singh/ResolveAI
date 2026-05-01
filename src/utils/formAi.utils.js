@@ -1,7 +1,7 @@
 const { mistralModel } = require('../services/ai.service');
 const { SystemMessage, HumanMessage } = require("@langchain/core/messages");
 const sendMail = require('../services/email.service');
-const ticketModel = require('../models/ticket.model');
+const { createEscalatedTicket } = require('../services/ticket.service');
 const userModel = require('../models/user.model');
 const chatBotModel = require('../models/chatbot.model');
 const formResultModel = require('../models/formResults.model');
@@ -69,23 +69,14 @@ TICKET`;
 
         if (hasPlaceholders || aiContent.toUpperCase().includes('TICKET')) {
             console.log(`[FormAI] AI requested ticket for form submission ${submission._id}`);
-            await ticketModel.create({
-                userId: user._id,
-                name: submission.data.name || submission.data.Name || "Form Submission",
-                email: userEmail || "no-email@provided.com",
+            await createEscalatedTicket(user, {
+                name: submission.data.name || submission.data.Name,
+                email: userEmail,
                 inquiree: `Form Submission: ${formTitle}\n\nData:\n${formData}`,
-                status: 'open',
-                priority: 'medium',
-                type: 'form'
+                type: 'form',
+                companyName: companyName,
+                subjectTitle: formTitle
             });
-
-            // Send confirmation email about the ticket
-            if (userEmail) {
-                const subject = `Ticket Received: ${formTitle}`;
-                const body = `Hi ${submission.data.name || submission.data.Name || 'there'},\n\nThank you for reaching out! We've received your inquiry. Because it requires a more detailed response, we have created a support ticket for our team.\n\nAn agent will review your request and get back to you shortly.\n\nBest regards,\n${companyName} Support Team`;
-                await sendMail(userEmail, subject, body, body.replace(/\n/g, '<br>'), user.emailSettings);
-                console.log(`[FormAI] Ticket confirmation email sent to ${userEmail}`);
-            }
 
             // Record: AI escalated, not resolved
             await formResultModel.findByIdAndUpdate(submission._id, {

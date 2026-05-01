@@ -1,7 +1,7 @@
 const { mistralModel } = require('../services/ai.service');
 const { SystemMessage, HumanMessage } = require('@langchain/core/messages');
 const sendMail = require('../services/email.service');
-const ticketModel = require('../models/ticket.model');
+const { createEscalatedTicket } = require('../services/ticket.service');
 const chatBotModel = require('../models/chatbot.model');
 const processedEmailModel = require('../models/processedEmail.model');
 const { simpleParser } = require('mailparser');
@@ -35,7 +35,7 @@ ${cleanBody.substring(0, 2000)}
 STRICT RULES:
 0. ESCALATE IMMEDIATELY: If the sender says anything like "talk to a human", "speak to an agent", "real person", "want a human", or any variation requesting human contact, respond ONLY with "TICKET". This overrides ALL other rules.
 1. ONLY generate a reply if you have 100% of the information required to fully and accurately answer this email.
-2. If you need to use placeholders like "[Insert link]" or "[Price]", respond ONLY with "TICKET".
+2. If you find yourself needing to use ANY placeholder text like "[Website Link]", "[App Link]", "[Price]", "[Name]", "[Insert X]", or ANY text inside square brackets [], respond ONLY with "TICKET". This is NON-NEGOTIABLE.
 3. If the email is complex, requires human judgment, is a complaint, or needs specific data you don't have, respond ONLY with "TICKET".
 4. NO HALLUCINATION: Do not invent facts, links, prices, or dates.
 5. If the email is a simple greeting or a "thank you", respond with a short friendly reply.
@@ -55,22 +55,22 @@ TICKET`;
         const aiContent = response.content.trim();
         console.log(`[EmailAI] Decision for UID ${email.uid}: ${aiContent.substring(0, 60)}...`);
 
-        if (aiContent.toUpperCase().includes('TICKET')) {
-            console.log(`[EmailAI] Creating ticket for email UID ${email.uid} from ${email.from}`);
-            await ticketModel.create({
-                userId: user._id,
-                name: email.from,
+        // Code-level guardrail: detect any placeholder patterns the AI may have missed
+        const hasPlaceholders = /\[[^\]]{1,60}\]/.test(aiContent);
+        if (hasPlaceholders) {
+            console.warn(`[EmailAI] Placeholder detected in AI response — forcing TICKET.`);
+        }
+
+        if (hasPlaceholders || aiContent.toUpperCase().includes('TICKET')) {
+            console.log(`[EmailAI] AI requested ticket for email UID ${email.uid} from ${email.from}`);
+            await createEscalatedTicket(user, {
+                name: email.from, // We don't have a specific name, just use the email as name
                 email: email.from,
                 inquiree: `Email Subject: ${email.subject}\n\nBody:\n${cleanBody.substring(0, 3000)}`,
-                status: 'open',
-                priority: 'medium',
-                type: 'email'
+                type: 'email',
+                companyName: companyName,
+                subjectTitle: email.subject
             });
-
-            // Send acknowledgment email to the sender
-            const ackSubject = `Re: ${email.subject}`;
-            const ackBody = `Hi,\n\nThank you for your email. We have received your message and created a support ticket for our team.\n\nAn agent will review your request and get back to you shortly.\n\nBest regards,\n${companyName} Support Team`;
-            await sendMail(email.from, ackSubject, ackBody, ackBody.replace(/\n/g, '<br>'), user.emailSettings);
         } else {
             const subjectMatch = aiContent.match(/Subject: (.*)/i);
             const subject = subjectMatch ? subjectMatch[1] : `Re: ${email.subject}`;

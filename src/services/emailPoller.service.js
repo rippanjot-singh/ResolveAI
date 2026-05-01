@@ -52,7 +52,7 @@ async function pollAllUsers() {
 }
 
 function startEmailPoller() {
-    cron.schedule('*/1 * * * *', pollAllUsers);
+    cron.schedule('*/5 * * * *', pollAllUsers);
     console.log('[EmailPoller] Inbox poller started (every 5 minutes).');
 }
 
