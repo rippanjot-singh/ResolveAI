@@ -8,11 +8,13 @@ const chatBotModel = require('../models/chatbot.model');
 async function processFormSubmission(form, submission) {
     try {
         console.log(`[FormAI] Processing submission for form: ${form.name} (${form._id})`);
-        const user = await userModel.findById(form.userId);
+        const user = await userModel.findById(form.userId).populate('companyId');
         if (!user) {
             console.warn(`[FormAI] User not found for ID: ${form.userId}`);
             return;
         }
+
+        const companyName = user.companyId?.name || user.name;
 
         // Try to find a chatbot for this user to get context/knowledge
         const chatbot = await chatBotModel.findOne({ userId: user._id });
@@ -26,7 +28,7 @@ async function processFormSubmission(form, submission) {
 
         console.log(`[FormAI] Detected email: ${userEmail || 'None'}`);
 
-        const systemPrompt = `You are a strict AI assistant processing a form submission for "${user.companyName || user.name}".
+        const systemPrompt = `You are a strict AI assistant processing a form submission for "${companyName}".
 Your goal is to determine if you can FULLY answer this inquiry based ONLY on the provided context.
 
 CONTEXT/KNOWLEDGE:
@@ -73,7 +75,7 @@ TICKET`;
             // Send confirmation email about the ticket
             if (userEmail) {
                 const subject = `Ticket Received: ${formTitle}`;
-                const body = `Hi ${submission.data.name || submission.data.Name || 'there'},\n\nThank you for reaching out! We've received your inquiry. Because it requires a more detailed response, we have created a support ticket for our team.\n\nAn agent will review your request and get back to you shortly.\n\nBest regards,\n${user.companyName || user.name} Support Team`;
+                const body = `Hi ${submission.data.name || submission.data.Name || 'there'},\n\nThank you for reaching out! We've received your inquiry. Because it requires a more detailed response, we have created a support ticket for our team.\n\nAn agent will review your request and get back to you shortly.\n\nBest regards,\n${companyName} Support Team`;
                 await sendMail(userEmail, subject, body, body.replace(/\n/g, '<br>'), user.emailSettings);
                 console.log(`[FormAI] Ticket confirmation email sent to ${userEmail}`);
             }

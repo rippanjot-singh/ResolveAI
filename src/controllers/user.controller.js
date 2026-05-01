@@ -1,0 +1,103 @@
+const userModel = require('../models/user.model');
+const { fetchEmails } = require('../services/imap.service');
+
+async function updateUser(req, res) {
+    try {
+        const { id } = req.params;
+        const updates = req.body;
+        const currentUser = req.user; // Assumes authMiddleware populates req.user
+
+        const user = await userModel.findById(id);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        // Role restriction: Only an admin can change any user's role
+        if (updates.role && updates.role !== user.role) {
+            if (currentUser.role !== 'admin') {
+                return res.status(403).json({ success: false, message: "Forbidden: Only admins can change user roles" });
+            }
+        }
+
+        // Apply updates from req.body to the user object
+        // We use a whitelist or iterate keys
+        const allowedUpdates = [
+            'companyId', 'name', 'email', 'password', 
+            'role', 'isOnboarded', 'isSolviingTickets', 
+            'speciality', 'emailSettings'
+        ];
+
+        Object.keys(updates).forEach(key => {
+            if (allowedUpdates.includes(key)) {
+                user[key] = updates[key];
+            }
+        });
+
+        // Save triggers the pre-save hooks in user.model.js
+        // (Handles password hashing and emailSettings encryption)
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: "User updated successfully",
+            data: user
+        });
+
+    } catch (error) {
+        console.error("Update User Error:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Internal server error", 
+            error: error.message 
+        });
+    }
+}
+
+async function getCompanyUsers(req, res){
+    try {
+        const { companyId } = req.params;
+        const users = await userModel.find({ companyId });
+        res.status(200).json({
+            success: true,
+            message: "Users fetched successfully",
+            data: users
+        });
+    } catch (error) {
+        console.error("Get Company Users Error:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Internal server error", 
+            error: error.message 
+        });
+    }
+}
+
+async function getUserEmails(req, res) {
+    try {
+        const user = await userModel.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        if (!user.emailSettings || !user.emailSettings.IMapHost) {
+            return res.status(400).json({ success: false, message: "IMAP settings not configured" });
+        }
+
+        const emails = await fetchEmails(user.emailSettings);
+        
+        res.status(200).json({
+            success: true,
+            message: "Emails fetched successfully",
+            data: emails
+        });
+    } catch (error) {
+        console.error("Get User Emails Error:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Internal server error", 
+            error: error.message 
+        });
+    }
+}
+
+module.exports = { updateUser, getCompanyUsers, getUserEmails };

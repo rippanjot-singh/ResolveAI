@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const userSchema = new mongoose.Schema({
-    companyName: {
-        type: String,
-        required: true,
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'company',
     },
     name: {
         type: String,
@@ -49,10 +49,12 @@ const userSchema = new mongoose.Schema({
         type: String,
     },
     emailSettings: {
-        Host: String,
-        Port: String,
+        SmtpHost: String,
+        SmtpPort: String,
         User: String,
         Pass: String,
+        IMapHost: String,
+        ImapPort: String,
         SupportEmail: String
     }
 }, { timestamps: true });
@@ -65,10 +67,11 @@ userSchema.pre('save', async function () {
 
     if (this.isModified('emailSettings')) {
         const { encrypt } = require('../utils/crypto.utils');
-        if (this.emailSettings.Host) this.emailSettings.Host = encrypt(this.emailSettings.Host);
+        if (this.emailSettings.SmtpHost) this.emailSettings.SmtpHost = encrypt(this.emailSettings.SmtpHost);
         if (this.emailSettings.User) this.emailSettings.User = encrypt(this.emailSettings.User);
         if (this.emailSettings.Pass) this.emailSettings.Pass = encrypt(this.emailSettings.Pass);
         if (this.emailSettings.SupportEmail) this.emailSettings.SupportEmail = encrypt(this.emailSettings.SupportEmail);
+        if (this.emailSettings.IMapHost) this.emailSettings.IMapHost = encrypt(this.emailSettings.IMapHost);
     }
 
     return;

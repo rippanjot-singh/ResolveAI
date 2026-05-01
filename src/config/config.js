@@ -25,12 +25,12 @@ if (!process.env.GOOGLE_API_KEY) {
     throw new Error("GOOGLE_API_KEY is not defined in environment variables")
 }
 
-if (!process.env.EMAIL_HOST) {
-    throw new Error("EMAIL_HOST is not defined in environment variables")
+if (!process.env.SMTP_HOST) {
+    throw new Error("SMTP_HOST is not defined in environment variables")
 }
 
-if (!process.env.EMAIL_PORT) {
-    throw new Error("EMAIL_PORT is not defined in environment variables")
+if (!process.env.SMTP_PORT) {
+    throw new Error("SMTP_PORT is not defined in environment variables")
 }
 
 if (!process.env.EMAIL_USER) {
@@ -59,8 +59,8 @@ const config = {
     BACKEND_URL: process.env.BACKEND_URL,
     MISTRAL_API_KEY: process.env.MISTRAL_API_KEY,
     GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
-    EMAIL_HOST: process.env.EMAIL_HOST,
-    EMAIL_PORT: process.env.EMAIL_PORT,
+    SMTP_HOST: process.env.SMTP_HOST,
+    SMTP_PORT: process.env.SMTP_PORT,
     EMAIL_USER: process.env.EMAIL_USER,
     EMAIL_PASS: process.env.EMAIL_PASS,
     SUPPORT_EMAIL: process.env.SUPPORT_EMAIL,

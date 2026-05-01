@@ -1,38 +1,57 @@
 const config = require('../config/config.js');
 const inviteTokenModel = require('../models/inviteToken.model.js');
 const userModel = require('../models/user.model.js');
+const companyModel = require('../models/company.model.js');
 const { generateToken, setAuthCookie } = require('../utils/auth.utils.js');
 const { registerSchema, loginSchema } = require('../validators/auth.validator.js');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 
 //-------------- REGISTER USER --------------//
 async function userRegisterController(req, res) {
     try {
         const { inviteToken } = req.query;
-        let role = '';
-        if (inviteToken) {
-            const inviteTokenData = await inviteTokenModel.findOne({ token: inviteToken });
-            role = inviteTokenData.role;
-        } else {
-            role = 'admin';
-        }
         const validated = registerSchema.parse(req.body);
         const { name, email, password, companyName } = validated;
 
         const isUserExists = await userModel.findOne({ email });
-
         if (isUserExists) {
             return res.status(422).json({ message: "User already exists", status: 'failed' });
         }
 
+        let role = '';
+        let companyId = null;
+
+        if (inviteToken) {
+            const inviteTokenData = await inviteTokenModel.findOne({ token: inviteToken });
+            if (!inviteTokenData) {
+                return res.status(400).json({ message: "Invalid or expired invite token", status: 'failed' });
+            }
+            role = inviteTokenData.role;
+            companyId = inviteTokenData.companyId;
+        } else {
+            role = 'admin';
+        }
+
+        // 1. Create the user
         const user = await userModel.create({
-            companyName,
             name,
             email,
             password,
-            role: role
+            role,
+            companyId // Will be null for new admins temporarily
         });
+
+        // 2. If it's a new admin, create the company and link it back
+        if (!inviteToken) {
+            const company = await companyModel.create({
+                name: companyName,
+                userId: user._id
+            });
+            user.companyId = company._id;
+            await user.save();
+        }
 
         const token = generateToken(user);
         setAuthCookie(res, token);
@@ -90,7 +109,7 @@ async function userLogoutController(req, res) {
 
 async function me(req, res) {
     try {
-        const user = await userModel.findById(req.user.userId).select("-password");
+        const user = await userModel.findById(req.user.userId).select("-password").populate('companyId');
         if (!user) {
             return res.status(404).json({ message: "User not found", status: 'failed' });
         }
@@ -110,7 +129,7 @@ async function createInviteTokenController(req, res) {
         }
         const token = crypto.randomBytes(32).toString('hex');
         const inviteToken = await inviteTokenModel.create({
-            companyName: user.companyName,
+            companyId: user.companyId,
             token: token,
             role: role,
             expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)

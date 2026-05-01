@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
 
 const inviteTokenSchema = new mongoose.Schema({
-    companyName: {
-        type: String,
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'company',
         required: true,
     },
     token: {

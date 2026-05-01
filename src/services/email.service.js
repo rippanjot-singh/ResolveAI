@@ -3,8 +3,8 @@ const config = require("../config/config");
 const { decrypt } = require("../utils/crypto.utils");
 
 const defaultTransporter = nodemailer.createTransport({
-  host: config.EMAIL_HOST,
-  port: config.EMAIL_PORT,
+  host: config.SMTP_HOST,
+  port: config.SMTP_PORT,
   secure: true,
   auth: {
     user: config.EMAIL_USER,
@@ -18,10 +18,10 @@ async function sendMail(to, subject, text, html, userEmailConfig = null) {
     let fromEmail = config.SUPPORT_EMAIL;
 
     // Use user-specific SMTP if provided
-    if (userEmailConfig && userEmailConfig.Host && userEmailConfig.User && userEmailConfig.Pass) {
+    if (userEmailConfig && userEmailConfig.SmtpHost && userEmailConfig.User && userEmailConfig.Pass) {
       transporter = nodemailer.createTransport({
-        host: decrypt(userEmailConfig.Host),
-        port: decrypt(userEmailConfig.Port) || 465,
+        host: decrypt(userEmailConfig.SmtpHost),
+        port: userEmailConfig.SmtpPort || 465,
         secure: true,
         auth: {
           user: decrypt(userEmailConfig.User),
