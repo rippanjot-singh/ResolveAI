@@ -7,7 +7,10 @@ const {
     listNotionPages,
     addNotionIntegration,
     removeNotionIntegration,
-    getNotionStatus
+    updateKnowledgeDescription,
+    getNotionStatus,
+    replaceKnowledgeSource,
+    disconnectNotion
 } = require('../controllers/notion.controller');
 
 router.get('/auth-url', authMiddleware, getNotionAuthUrl);
@@ -16,5 +19,8 @@ router.get('/status', authMiddleware, getNotionStatus);
 router.get('/pages', authMiddleware, listNotionPages);
 router.post('/integrate', authMiddleware, addNotionIntegration);
 router.post('/remove', authMiddleware, removeNotionIntegration);
+router.post('/update-description', authMiddleware, updateKnowledgeDescription);
+router.post('/replace-source', authMiddleware, replaceKnowledgeSource);
+router.post('/disconnect-workspace', authMiddleware, disconnectNotion);
 
 module.exports = router;

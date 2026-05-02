@@ -4,6 +4,7 @@ const { updateTicketSchema } = require("../validators/ticket.validator");
 const sendMail = require("../services/email.service");
 const { chatRag } = require("../services/rag.service");
 const leadModel = require("../models/lead.model");
+const { getIO } = require("../utils/socket");
 
 async function createTicketController(req, res) {
     try {
@@ -33,6 +34,13 @@ async function createTicketController(req, res) {
             email,
             note: `lead created manually. [TICKET: ${ticket._id}] [INQUIREE: ${inquiree}]`
         })
+
+        // Emit socket event to company room
+        try {
+            getIO().to(companyId.toString()).emit('new_ticket', ticket);
+        } catch (err) {
+            console.error('Socket emit error:', err);
+        }
 
         return res.status(201).json({
             message: "Ticket created successfully",
@@ -166,6 +174,12 @@ async function resolveTicketController(req, res) {
 
         chatRag(ticket.inquiree, replyContent, user.companyId)
 
+        // Emit socket event
+        try {
+            getIO().to(user.companyId.toString()).emit('ticket_updated', updatedTicket);
+        } catch (err) {
+            console.error('Socket emit error:', err);
+        }
 
         return res.status(200).json({
             message: "Ticket resolved successfully",

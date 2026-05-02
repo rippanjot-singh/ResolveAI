@@ -2,6 +2,10 @@ const allTools = require('../tools/ai.tools');
 const { SystemMessage, ToolMessage, HumanMessage, AIMessage } = require("@langchain/core/messages");
 const chatBotModel = require('../models/chatbot.model');
 const chatModel = require('../models/chat.model');
+const companyModel = require('../models/company.model');
+const { tool } = require("@langchain/core/tools");
+const { z } = require("zod");
+const notionService = require('../services/notion.service');
 const { recordInteraction } = require('../utils/interaction.utils');
 const { modelWithTools, mistralModel } = require('../services/ai.service');
 const { isDomainVerified } = require('../utils/domain.utils');
@@ -30,6 +34,11 @@ async function askAI(req, res) {
             return res.status(404).json({ success: false, message: 'Chatbot not found' });
         }
 
+        const company = await companyModel.findById(chatBot.companyId);
+        if (!company) {
+            return res.status(404).json({ success: false, message: 'Company not found' });
+        }
+
         // Domain verification
         if (!isDomainVerified(req, chatBot)) {
             return res.status(403).json({ success: false, message: "Widget disabled for this domain." });
@@ -38,6 +47,43 @@ async function askAI(req, res) {
         if (!chatBot.isActive) {
             return res.status(403).json({ success: false, message: "Chatbot is currently inactive." });
         }
+
+        // Dynamic Tools from Company Knowledge
+        const dynamicTools = {};
+        const knowledgeTools = [];
+
+        if (company.knowledge && company.knowledge.length > 0) {
+            for (const item of company.knowledge) {
+                if (item.isActive && item.provider === 'notion' && company.notionTokens?.access_token) {
+                    const toolName = item.name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+                    const notionTool = tool(
+                        async () => {
+                            try {
+                                console.log(`Fetching Notion content for tool: ${toolName}`);
+                                const content = await notionService.getPageContent(company.notionTokens.access_token, item.fileId);
+                                return content || "No content found in this page.";
+                            } catch (err) {
+                                console.error(`Error in dynamic tool ${toolName}:`, err);
+                                return "Failed to fetch content from Notion.";
+                            }
+                        },
+                        {
+                            name: toolName,
+                            description: item.description || `Search and retrieve information from the ${item.name} document.`,
+                            schema: z.object({}) 
+                        }
+                    );
+                    dynamicTools[toolName] = notionTool;
+                    knowledgeTools.push(notionTool);
+                }
+            }
+        }
+
+        // Combine default tools with dynamic tools
+        const currentModelWithTools = mistralModel.bindTools([
+            ...Object.values(allTools),
+            ...knowledgeTools
+        ]);
 
         const historyMessages = history.map(msg => 
           msg.role === "user" ? new HumanMessage(msg.content) : new AIMessage(msg.content)
@@ -79,7 +125,7 @@ async function askAI(req, res) {
         const timeoutPromise = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), ms));
 
         let response = await Promise.race([
-            modelWithTools.invoke(messages),
+            currentModelWithTools.invoke(messages),
             timeoutPromise(30000)
         ]);
         console.log("Model response received.");
@@ -93,7 +139,7 @@ async function askAI(req, res) {
 
             for (const toolCall of response.tool_calls) {
                 toolCallHistory.push(toolCall);
-                const toolToExecute = allTools[toolCall.name];
+                const toolToExecute = allTools[toolCall.name] || dynamicTools[toolCall.name];
 
                 if (toolToExecute) {
                     console.log(`Executing tool: ${toolCall.name} with args:`, toolCall.args);
@@ -118,7 +164,7 @@ async function askAI(req, res) {
             if (toolResults.length > 0) {
                 console.log("Re-invoking model with tool results...");
                 const finalResponse = await Promise.race([
-                    modelWithTools.invoke([
+                    currentModelWithTools.invoke([
                         ...messages,
                         response,
                         ...toolResults

@@ -1,5 +1,4 @@
-const userModel = require('../models/user.model');
-const chatBotModel = require('../models/chatbot.model');
+const companyModel = require('../models/company.model');
 const notionService = require('../services/notion.service');
 
 async function getNotionAuthUrl(req, res) {
@@ -20,16 +19,16 @@ async function notionCallback(req, res) {
 
         const notionData = await notionService.exchangeCodeForToken(code);
         
-        // Identification logic (assuming auth middleware or cookie)
-        const userId = req.user?.userId || req.userId; 
+        const companyId = req.user?.companyId || req.companyId; 
+        const userId = req.user?.userId || req.userId;
 
-        if (!userId) {
-            console.error('Notion Callback: No user ID found in request');
+        if (!companyId) {
+            console.error('Notion Callback: No company ID found in request');
             return res.status(401).send('<h1>Auth failed</h1><p>Session expired. Please log in again.</p>');
         }
 
-        console.log('Updating Notion tokens for user:', userId);
-        await userModel.findByIdAndUpdate(userId, {
+        console.log('Updating Notion tokens for company:', companyId);
+        await companyModel.findByIdAndUpdate(companyId, {
             notionTokens: {
                 access_token: notionData.access_token,
                 workspace_id: notionData.workspace_id,
@@ -54,12 +53,12 @@ async function notionCallback(req, res) {
 
 async function listNotionPages(req, res) {
     try {
-        const user = await userModel.findById(req.user.userId);
-        if (!user || !user.notionTokens?.access_token) {
+        const company = await companyModel.findById(req.user.companyId);
+        if (!company || !company.notionTokens?.access_token) {
             return res.status(400).json({ success: false, message: "Notion not connected", status: "not_connected" });
         }
 
-        const pages = await notionService.listPages(user.notionTokens.access_token);
+        const pages = await notionService.listPages(company.notionTokens.access_token);
         return res.status(200).json({ success: true, pages });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
@@ -68,28 +67,28 @@ async function listNotionPages(req, res) {
 
 async function addNotionIntegration(req, res) {
     try {
-        const { chatbotId, pageId, name, description } = req.body;
+        const { pageId, name, description } = req.body;
         const { companyId } = req.user;
 
-        const chatbot = await chatBotModel.findOne({ _id: chatbotId, companyId });
-        if (!chatbot) {
-            return res.status(404).json({ success: false, message: "Chatbot not found" });
+        const company = await companyModel.findById(companyId);
+        if (!company) {
+            return res.status(404).json({ success: false, message: "Company not found" });
         }
 
-        const exists = chatbot.integrations.find(i => i.fileId === pageId);
+        const exists = company.knowledge.find(i => i.fileId === pageId);
         if (exists) {
             return res.status(400).json({ success: false, message: "Page already integrated" });
         }
 
-        chatbot.integrations.push({
+        company.knowledge.push({
             provider: 'notion',
             fileId: pageId,
             name,
             description: description || 'Notion Page'
         });
 
-        await chatbot.save();
-        return res.status(200).json({ success: true, message: "Notion page integrated", integrations: chatbot.integrations });
+        await company.save();
+        return res.status(200).json({ success: true, message: "Notion page integrated", knowledge: company.knowledge });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -97,18 +96,42 @@ async function addNotionIntegration(req, res) {
 
 async function removeNotionIntegration(req, res) {
     try {
-        const { chatbotId, pageId } = req.body;
+        const { pageId } = req.body;
         const { companyId } = req.user;
 
-        const chatbot = await chatBotModel.findOne({ _id: chatbotId, companyId });
-        if (!chatbot) {
-            return res.status(404).json({ success: false, message: "Chatbot not found" });
+        const company = await companyModel.findById(companyId);
+        if (!company) {
+            return res.status(404).json({ success: false, message: "Company not found" });
         }
 
-        chatbot.integrations = chatbot.integrations.filter(i => i.fileId !== pageId);
-        await chatbot.save();
+        company.knowledge = company.knowledge.filter(i => i.fileId !== pageId);
+        await company.save();
 
-        return res.status(200).json({ success: true, message: "Integration removed", integrations: chatbot.integrations });
+        return res.status(200).json({ success: true, message: "Integration removed", knowledge: company.knowledge });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function updateKnowledgeDescription(req, res) {
+    try {
+        const { pageId, description } = req.body;
+        const { companyId } = req.user;
+
+        const company = await companyModel.findById(companyId);
+        if (!company) {
+            return res.status(404).json({ success: false, message: "Company not found" });
+        }
+
+        const knowledgeItem = company.knowledge.find(i => i.fileId === pageId);
+        if (!knowledgeItem) {
+            return res.status(404).json({ success: false, message: "Knowledge item not found" });
+        }
+
+        knowledgeItem.description = description;
+        await company.save();
+
+        return res.status(200).json({ success: true, message: "Description updated", knowledge: company.knowledge });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
     }
@@ -116,16 +139,77 @@ async function removeNotionIntegration(req, res) {
 
 async function getNotionStatus(req, res) {
     try {
-        const user = await userModel.findById(req.user.userId);
-        const isConnected = !!(user?.notionTokens?.access_token);
+        const company = await companyModel.findById(req.user.companyId);
+        const isConnected = !!(company?.notionTokens?.access_token);
         
         return res.status(200).json({ 
             success: true, 
             isConnected,
-            workspace: isConnected ? user.notionTokens.workspace_name : null 
+            workspace: isConnected ? company.notionTokens.workspace_name : null,
+            knowledge: company?.knowledge || []
         });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function replaceKnowledgeSource(req, res) {
+    try {
+        const { oldPageId, newPageId, name, description } = req.body;
+        const companyId = req.user?.companyId || req.companyId;
+
+        const company = await companyModel.findById(companyId);
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        const itemIndex = company.knowledge.findIndex(k => k.fileId === oldPageId);
+        if (itemIndex === -1) return res.status(404).json({ success: false, message: 'Original source not found' });
+
+        if (oldPageId !== newPageId && company.knowledge.some(k => k.fileId === newPageId)) {
+            return res.status(400).json({ success: false, message: 'New page is already integrated' });
+        }
+
+        company.knowledge[itemIndex] = {
+            ...company.knowledge[itemIndex].toObject(),
+            fileId: newPageId,
+            name: name,
+            description: description || company.knowledge[itemIndex].description
+        };
+
+        await company.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Source replaced successfully',
+            knowledge: company.knowledge
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function disconnectNotion(req, res) {
+    try {
+        const companyId = req.user?.companyId || req.companyId;
+        const company = await companyModel.findById(companyId);
+        
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found' });
+
+        company.notionTokens = {
+            access_token: null,
+            workspace_id: null,
+            workspace_name: null,
+            workspace_icon: null,
+            bot_id: null
+        };
+
+        await company.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Notion disconnected successfully'
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 }
 
@@ -135,6 +219,8 @@ module.exports = {
     listNotionPages,
     addNotionIntegration,
     removeNotionIntegration,
-    getNotionStatus
+    updateKnowledgeDescription,
+    getNotionStatus,
+    replaceKnowledgeSource,
+    disconnectNotion
 };
-

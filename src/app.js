@@ -10,6 +10,7 @@ const formRoutes = require('./routes/form.routes.js');
 const userRoutes = require('./routes/user.routes.js');
 const dashboardRoutes = require('./routes/dashboard.routes.js');
 const notionRoutes = require('./routes/notion.routes.js');
+const analyticsRoutes = require('./routes/analytics.routes.js');
 const path = require('path');
 
 const app = express();
@@ -42,5 +43,6 @@ app.use('/api/form', formRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notion', notionRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 module.exports = app;
