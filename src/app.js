@@ -9,6 +9,7 @@ const chatRoutes = require('./routes/chat.routes.js');
 const formRoutes = require('./routes/form.routes.js');
 const userRoutes = require('./routes/user.routes.js');
 const dashboardRoutes = require('./routes/dashboard.routes.js');
+const notionRoutes = require('./routes/notion.routes.js');
 const path = require('path');
 
 const app = express();
@@ -40,5 +41,6 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/form', formRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notion', notionRoutes);
 
 module.exports = app;
