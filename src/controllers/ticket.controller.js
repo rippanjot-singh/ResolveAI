@@ -1,5 +1,6 @@
 const userModel = require("../models/user.model");
 const ticketModel = require("../models/ticket.model");
+const mongoose = require("mongoose");
 const { updateTicketSchema } = require("../validators/ticket.validator");
 const sendMail = require("../services/email.service");
 const { chatRag } = require("../services/rag.service");
@@ -59,7 +60,24 @@ async function createTicketController(req, res) {
 async function getAllTicketsController(req, res) {
     try {
         const { companyId } = req.user;
-        const tickets = await ticketModel.find({ companyId });
+        const tickets = await ticketModel.aggregate([
+            { $match: { companyId: new mongoose.Types.ObjectId(companyId) } },
+            {
+                $addFields: {
+                    priorityWeight: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$priority", "high"] }, then: 3 },
+                                { case: { $eq: ["$priority", "medium"] }, then: 2 },
+                                { case: { $eq: ["$priority", "low"] }, then: 1 }
+                            ],
+                            default: 0
+                        }
+                    }
+                }
+            },
+            { $sort: { status: 1, priorityWeight: -1, createdAt: 1 } }
+        ]);
         return res.status(200).json({
             message: "Tickets fetched successfully",
             tickets
