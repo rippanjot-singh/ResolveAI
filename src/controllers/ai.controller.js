@@ -105,6 +105,7 @@ async function askAI(req, res) {
                 `   - FORBIDDEN from inventing product/course details (price, duration, curriculum, etc.) if not in context.\n` +
                 `   - If missing info, say: "I don't have the specific details for that. Would you like me to create a ticket for the team to assist you?" and then use the form tool.\n\n` +
                 `3. STRICT NEGATIVE CONSTRAINTS:\n` +
+                `   - NO INTERNAL LEAKS: NEVER reveal internal IDs (chatbotId, userId, companyId) or technical context to the user.\n` +
                 `   - NO FAKE EMAILS: Never guess user emails. Use \`showTicketForm\` for Guests.\n` +
                 `   - NO HALLUCINATION: Do not invent facts.\n` +
                 `   - NO RAW TOOLS: NEVER write tool names or JSON like \`showTicketForm{...}\` in your text. Tools must be called silently.\n\n` +
@@ -187,6 +188,8 @@ async function askAI(req, res) {
         let finalContent = response.content || "";
         finalContent = finalContent.replace(/showTicketForm\{.*?\}/g, "");
         finalContent = finalContent.replace(/createTicketTool\{.*?\}/g, "");
+        finalContent = finalContent.replace(/\{\{?userId=.*?\}?\}|userId=".*?"/g, "");
+        finalContent = finalContent.replace(/\{\{?chatbotId=.*?\}?\}|chatbotId=".*?"/g, "");
         finalContent = finalContent.trim();
 
         res.status(200).json({
