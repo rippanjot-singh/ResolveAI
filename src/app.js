@@ -8,6 +8,7 @@ const ticketRoutes = require('./routes/ticket.routes.js');
 const chatRoutes = require('./routes/chat.routes.js');
 const formRoutes = require('./routes/form.routes.js');
 const userRoutes = require('./routes/user.routes.js');
+const dashboardRoutes = require('./routes/dashboard.routes.js');
 const path = require('path');
 
 const app = express();
@@ -38,5 +39,6 @@ app.use('/api/ticket', ticketRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/form', formRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 module.exports = app;

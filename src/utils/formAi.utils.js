@@ -18,7 +18,7 @@ async function processFormSubmission(form, submission) {
         const companyName = user.companyId?.name || user.name;
 
         // Try to find a chatbot for this user to get context/knowledge
-        const chatbot = await chatBotModel.findOne({ userId: user._id });
+        const chatbot = await chatBotModel.findOne({ companyId: user.companyId });
         const context = chatbot ? chatbot.prompt : user.speciality || "A professional assistant.";
 
         const formTitle = form.name;

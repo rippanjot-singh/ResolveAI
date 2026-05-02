@@ -6,7 +6,7 @@ const router = express.Router()
 router.post('/signup', userRegisterController)
 router.post('/login', userLoginController)
 router.post('/logout', userLogoutController)
-router.get('/me', authMiddleware, me)
 router.post('/invite', authMiddleware, createInviteTokenController)
+router.get('/me', authMiddleware, me)
 
 module.exports = router

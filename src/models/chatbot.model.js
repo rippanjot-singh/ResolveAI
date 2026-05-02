@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const chatBotSchema = new mongoose.Schema({
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'company',
+        required: true
+    },
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'user',

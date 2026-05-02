@@ -1,5 +1,6 @@
 const Form = require('../models/form.model');
 const FormResult = require('../models/formResults.model');
+const leadModel = require('../models/lead.model');
 
 async function submitPublicForm(req, res) {
     try {
@@ -30,6 +31,12 @@ async function submitPublicForm(req, res) {
                 referrer: req.get('Referrer')
             }
         });
+        const lead = await leadModel.create({
+            companyId: form.companyId,
+            name: data.name,
+            email: data.email,
+            note: `lead captured from form ${formId}. [RESULT: ${JSON.stringify(data)}]`
+        })
 
         // Background: Process submission with AI (don't await to avoid blocking response)
         const { processFormSubmission } = require('../utils/formAi.utils');
@@ -44,7 +51,8 @@ async function submitPublicForm(req, res) {
         res.status(201).json({
             success: true,
             message: "Response submitted successfully",
-            data: result
+            data: result,
+            lead: lead
         });
     } catch (error) {
         console.error("Form Submission Error:", error);
@@ -75,7 +83,9 @@ async function createForm(req, res) {
             return res.status(400).json({ success: false, message: "userId is required to create a form" });
         }
 
+        const { companyId } = req.user;
         const form = await Form.create({
+            companyId,
             userId,
             name,
             description,

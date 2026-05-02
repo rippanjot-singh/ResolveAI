@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
  */
 const generateToken = (user, expiresIn = '3d') => {
     return jwt.sign(
-        { userId: user._id, email: user.email },
+        { userId: user._id, email: user.email, companyId: user.companyId },
         process.env.JWT_SECRET,
         { expiresIn }
     );

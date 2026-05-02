@@ -13,6 +13,7 @@ async function createEscalatedTicket(user, {
     
     // Create the ticket
     await ticketModel.create({
+        companyId: user.companyId,
         userId: user._id,
         name: name || "Unknown",
         email: email || "no-email@provided.com",

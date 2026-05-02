@@ -97,7 +97,13 @@ async function askAI(req, res) {
 
                 if (toolToExecute) {
                     console.log(`Executing tool: ${toolCall.name} with args:`, toolCall.args);
-                    const result = await toolToExecute.invoke(toolCall.args);
+                    
+                    const argsWithContext = { 
+                        ...toolCall.args,
+                        companyId: chatBot.companyId
+                    };
+
+                    const result = await toolToExecute.invoke(argsWithContext);
                     console.log(`Tool ${toolCall.name} result:`, result);
 
                     toolResults.push(new ToolMessage({
@@ -250,10 +256,19 @@ async function makePromptwithWebsiteData(req, res) {
         })
         // console.log(result.content);
 
-        res.status(200).json({ result: result.content, promptwithdata, updatedChatBot, fullResponse: result });
+        res.status(200).json({ 
+            success: true, 
+            message: "Prompt generated from website successfully",
+            prompt: result.content, 
+            updatedChatBot 
+        });
     } catch (error) {
         console.error("Error in makePrompt:", error);
-        res.status(500).json({ error: "Failed to get response from AI", error });
+        res.status(500).json({ 
+            success: false, 
+            message: "Failed to get response from AI", 
+            error: error.message 
+        });
     }
 }
 
@@ -297,7 +312,7 @@ async function makePromptwithPDFData(req, res) {
         console.error("Error uploading PDF:", error);
         res.status(500).json({
             success: false,
-            message: "Failed to upload PDF",
+            message: "Failed to process PDF",
             error: error.message
         });
     }

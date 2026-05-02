@@ -1,6 +1,7 @@
 const chatModel = require('../models/chat.model');
 const chatBotModel = require('../models/chatbot.model');
 const ticketModel = require('../models/ticket.model');
+const leadModel = require('../models/lead.model');
 
 async function initChat(req, res) {
     try {
@@ -21,12 +22,20 @@ async function initChat(req, res) {
             email
         });
 
+        const lead = await leadModel.create({
+            companyId: chatbot.companyId,
+            name,
+            email,
+            note: `lead captured from chatbot ${chatbotId}`
+        })
+
         res.status(201).json({
             success: true,
             message: "Chat initialized",
             data: {
                 chatId: chat._id
-            }
+            },
+            lead
         });
     } catch (error) {
         console.error("Init Chat Error:", error);
@@ -42,7 +51,11 @@ async function createPublicTicket(req, res) {
             return res.status(400).json({ success: false, message: "Email and inquiree are required" });
         }
 
+        const chat = await chatModel.findById(chatId);
+        const chatbot = await chatBotModel.findById(chat.chatbotId);
+
         const ticket = await ticketModel.create({
+            companyId: chatbot.companyId,
             name,
             email,
             inquiree,

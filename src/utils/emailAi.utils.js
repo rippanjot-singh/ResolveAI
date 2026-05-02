@@ -4,6 +4,7 @@ const sendMail = require('../services/email.service');
 const { createEscalatedTicket } = require('../services/ticket.service');
 const chatBotModel = require('../models/chatbot.model');
 const processedEmailModel = require('../models/processedEmail.model');
+const leadModel = require('../models/lead.model');
 const { simpleParser } = require('mailparser');
 
 async function processIncomingEmail(user, email) {
@@ -13,8 +14,19 @@ async function processIncomingEmail(user, email) {
         if (alreadyDone) return;
 
         const companyName = user.companyId?.name || user.name;
-        const chatbot = await chatBotModel.findOne({ userId: user._id });
+        const chatbot = await chatBotModel.findOne({ companyId: user.companyId });
         const context = chatbot ? chatbot.prompt : user.speciality || 'A professional assistant.';
+
+        try {
+            await leadModel.create({
+                companyId: user.companyId,
+                name: email.from,
+                email: email.from,
+                note: `lead captured from incoming email UID ${email.uid}. Subject: ${email.subject}`
+            });
+        } catch (e) {
+            console.error('[EmailAI] Failed to create lead for incoming email:', e.message);
+        }
 
         // Parse the raw MIME source to extract clean text
         const parsed = await simpleParser(email.body);
@@ -61,8 +73,12 @@ TICKET`;
             console.warn(`[EmailAI] Placeholder detected in AI response — forcing TICKET.`);
         }
 
+        let processingStatus = 'skipped';
+        let finalResponse = '';
+
         if (hasPlaceholders || aiContent.toUpperCase().includes('TICKET')) {
             console.log(`[EmailAI] AI requested ticket for email UID ${email.uid} from ${email.from}`);
+            processingStatus = 'ticket';
             await createEscalatedTicket(user, {
                 name: email.from, // We don't have a specific name, just use the email as name
                 email: email.from,
@@ -72,19 +88,42 @@ TICKET`;
                 subjectTitle: email.subject
             });
         } else {
+            processingStatus = 'replied';
             const subjectMatch = aiContent.match(/Subject: (.*)/i);
             const subject = subjectMatch ? subjectMatch[1] : `Re: ${email.subject}`;
             const body = aiContent.replace(/Subject: .*/i, '').trim();
+            finalResponse = body;
 
             await sendMail(email.from, subject, body, body.replace(/\n/g, '<br>'), user.emailSettings);
             console.log(`[EmailAI] Reply sent to ${email.from} for UID ${email.uid}`);
         }
 
         // Mark as processed regardless of outcome
-        await processedEmailModel.create({ userId: user._id, uid: email.uid });
+        await processedEmailModel.create({ 
+            userId: user._id, 
+            uid: email.uid,
+            from: email.from,
+            subject: email.subject,
+            status: processingStatus,
+            aiResponse: finalResponse || aiContent
+        });
 
     } catch (error) {
         console.error(`[EmailAI] Error processing email UID ${email.uid}:`, error.message);
+        
+        // Try to mark as error so we don't infinitely retry failing emails
+        try {
+            await processedEmailModel.create({ 
+                userId: user._id, 
+                uid: email.uid,
+                from: email.from,
+                subject: email.subject,
+                status: 'error',
+                aiResponse: error.message
+            });
+        } catch (dbErr) {
+            console.error(`[EmailAI] Failed to save error state for UID ${email.uid}:`, dbErr.message);
+        }
     }
 }
 

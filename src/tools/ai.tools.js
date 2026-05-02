@@ -3,7 +3,7 @@ const { z } = require("zod");
 const ticketModel = require("../models/ticket.model");
 
 const createTicketTool = tool(
-    async ({ name, email, inquiree, priority }) => {
+    async ({ name, email, inquiree, priority, companyId }) => {
         try {
             if (name.toLowerCase() === 'guest' || email.includes('example.com')) {
                 return {
@@ -13,6 +13,7 @@ const createTicketTool = tool(
             }
 
             const ticket = await ticketModel.create({
+                companyId,
                 name,
                 email,
                 inquiree,

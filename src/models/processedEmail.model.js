@@ -9,6 +9,20 @@ const processedEmailSchema = new mongoose.Schema({
     uid: {
         type: Number,
         required: true
+    },
+    from: {
+        type: String,
+    },
+    subject: {
+        type: String,
+    },
+    status: {
+        type: String,
+        enum: ['replied', 'ticket', 'skipped', 'error'],
+        default: 'skipped'
+    },
+    aiResponse: {
+        type: String
     }
 }, { timestamps: true });
 

@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const ticketSchema = new mongoose.Schema({
+    companyId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'company',
+        required: true
+    },
     name: {
         type: String
     },

@@ -3,10 +3,11 @@ const { isDomainVerified } = require("../utils/domain.utils");
 
 async function createChatbotController(req, res) {
     try {
-        const { userId } = req.user;
+        const { userId, companyId } = req.user;
         const { name } = req.body;
 
         const chatBot = await chatBotModel.create({
+            companyId: companyId,
             userId: userId,
             name: name,
         })
@@ -18,8 +19,8 @@ async function createChatbotController(req, res) {
 
 async function getMyChatbotsController(req, res) {
     try {
-        const { userId } = req.user;
-        const chatbots = await chatBotModel.find({ userId: userId });
+        const { companyId } = req.user;
+        const chatbots = await chatBotModel.find({ companyId });
         return res.status(200).json({ success: true, message: "Chatbots fetched successfully", status: "success", chatbots });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message, status: "failed" });
@@ -30,11 +31,11 @@ const { updateChatbotSchema } = require("../validators/chatbot.validator");
 
 async function updateChatbotController(req, res) {
     try {
-        const { userId } = req.user;
+        const { companyId } = req.user;
         const { id } = req.params;
 
-        // Check if chatbot exists and belongs to the user
-        const chatbot = await chatBotModel.findOne({ _id: id, userId });
+        // Check if chatbot exists and belongs to the company
+        const chatbot = await chatBotModel.findOne({ _id: id, companyId });
         if (!chatbot) {
             return res.status(404).json({ success: false, message: "Chatbot not found or unauthorized", status: "failed" });
         }
@@ -69,11 +70,11 @@ async function updateChatbotController(req, res) {
 
 async function deleteChatbotController(req, res) {
     try {
-        const { userId } = req.user;
+        const { companyId } = req.user;
         const { id } = req.params;
 
-        // Check if chatbot exists and belongs to the user
-        const chatbot = await chatBotModel.findOne({ _id: id, userId });
+        // Check if chatbot exists and belongs to the company
+        const chatbot = await chatBotModel.findOne({ _id: id, companyId });
         if (!chatbot) {
             return res.status(404).json({ success: false, message: "Chatbot not found or unauthorized", status: "failed" });
         }
@@ -105,7 +106,7 @@ async function getWidgetConfigController(req, res) {
 
 async function toggleChatBotStatusController(req, res) {
     try {
-        const chatbot = await chatBotModel.findOne({ _id: req.params.id, userId: req.user.userId });
+        const chatbot = await chatBotModel.findOne({ _id: req.params.id, companyId: req.user.companyId });
         if (!chatbot) return res.status(404).json({ success: false, message: "Not found" });
 
         chatbot.isActive = !chatbot.isActive;

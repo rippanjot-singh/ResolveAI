@@ -3,10 +3,11 @@ const ticketModel = require("../models/ticket.model");
 const { updateTicketSchema } = require("../validators/ticket.validator");
 const sendMail = require("../services/email.service");
 const { chatRag } = require("../services/rag.service");
+const leadModel = require("../models/lead.model");
 
 async function createTicketController(req, res) {
     try {
-        const { userId } = req.user;
+        const { userId, companyId } = req.user;
         const { name, email, inquiree, assignedTo, priority, priorityLevel } = req.body;
 
         const user = await userModel.findOne({ _id: userId });
@@ -17,6 +18,7 @@ async function createTicketController(req, res) {
         }
 
         const ticket = await ticketModel.create({
+            companyId,
             name,
             email,
             inquiree,
@@ -25,9 +27,17 @@ async function createTicketController(req, res) {
             priorityLevel
         });
 
+        const lead = await leadModel.create({
+            companyId,
+            name,
+            email,
+            note: `lead created manually. [TICKET: ${ticket._id}] [INQUIREE: ${inquiree}]`
+        })
+
         return res.status(201).json({
             message: "Ticket created successfully",
-            ticket
+            ticket,
+            lead
         });
 
     } catch (error) {
@@ -40,7 +50,8 @@ async function createTicketController(req, res) {
 
 async function getAllTicketsController(req, res) {
     try {
-        const tickets = await ticketModel.find();
+        const { companyId } = req.user;
+        const tickets = await ticketModel.find({ companyId });
         return res.status(200).json({
             message: "Tickets fetched successfully",
             tickets
