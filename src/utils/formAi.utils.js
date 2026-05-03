@@ -5,6 +5,7 @@ const { createEscalatedTicket } = require('../services/ticket.service');
 const userModel = require('../models/user.model');
 const chatBotModel = require('../models/chatbot.model');
 const formResultModel = require('../models/formResults.model');
+const { getReleventMessages } = require('../services/rag.service');
 
 async function processFormSubmission(form, submission) {
     try {
@@ -29,11 +30,24 @@ async function processFormSubmission(form, submission) {
 
         console.log(`[FormAI] Detected email: ${userEmail || 'None'}`);
 
+        // Fetch relevant past resolutions
+        let pastResolutions = "";
+        try {
+            const ragRes = await getReleventMessages(formData, user.companyId);
+            if (ragRes && ragRes.matches && ragRes.matches.length > 0) {
+                pastResolutions = "\nPAST HUMAN RESOLUTIONS (HIGH PRIORITY KNOWLEDGE):\n" + 
+                    ragRes.matches.map(m => "- " + m.metadata.text).join('\n');
+            }
+        } catch (e) {
+            console.error('[FormAI] RAG fetch error:', e.message);
+        }
+
         const systemPrompt = `You are a strict AI assistant processing a form submission for "${companyName}".
-Your goal is to determine if you can FULLY answer this inquiry based ONLY on the provided context.
+Your goal is to determine if you can FULLY answer this inquiry based ONLY on the provided context and past resolutions.
 
 CONTEXT/KNOWLEDGE:
 ${context}
+${pastResolutions}
 
 FORM SUBMISSION ("${formTitle}"):
 ${formData}

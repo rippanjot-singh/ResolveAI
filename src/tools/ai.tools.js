@@ -60,7 +60,39 @@ const showTicketForm = tool(
     }
 )
 
+const getRelevantMessagesTool = tool(
+    async ({ inquiry, companyId }) => {
+        try {
+            const { getReleventMessages } = require("../services/rag.service");
+            const messages = await getReleventMessages(inquiry, companyId);
+            
+            if (!messages || !messages.matches || messages.matches.length === 0) {
+                return {
+                    status: "success",
+                    message: "No relevant past resolutions found."
+                };
+            }
+
+            return {
+                status: "success",
+                resolutions: messages.matches.map(m => m.metadata.text)
+            };
+        } catch (error) {
+            console.error("getRelevantMessagesTool error:", error);
+            return { status: "failed", error: error.message };
+        }
+    },
+    {
+        name: "getRelevantMessagesTool",
+        description: "Search for past resolved tickets and human responses to help answer the user's question. Use this BEFORE creating a ticket to see if a human has already solved a similar issue. IMPORTANT: If you find a relevant answer, use it to reply directly to the user instead of creating a ticket.",
+        schema: z.object({
+            inquiry: z.string().describe("A summary of what the user is asking about."),
+        })
+    }
+);
+
 module.exports = {
     createTicketTool,
-    showTicketForm
+    showTicketForm,
+    getRelevantMessagesTool
 };

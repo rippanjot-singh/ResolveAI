@@ -6,6 +6,7 @@ const chatBotModel = require('../models/chatbot.model');
 const processedEmailModel = require('../models/processedEmail.model');
 const leadModel = require('../models/lead.model');
 const { simpleParser } = require('mailparser');
+const { getReleventMessages } = require('../services/rag.service');
 
 async function processIncomingEmail(user, email) {
     try {
@@ -32,11 +33,24 @@ async function processIncomingEmail(user, email) {
         const parsed = await simpleParser(email.body);
         const cleanBody = parsed.text || parsed.html || email.body;
 
+        // Fetch relevant past resolutions
+        let pastResolutions = "";
+        try {
+            const ragRes = await getReleventMessages(email.subject + " " + cleanBody, user.companyId);
+            if (ragRes && ragRes.matches && ragRes.matches.length > 0) {
+                pastResolutions = "\nPAST HUMAN RESOLUTIONS (HIGH PRIORITY KNOWLEDGE):\n" + 
+                    ragRes.matches.map(m => "- " + m.metadata.text).join('\n');
+            }
+        } catch (e) {
+            console.error('[EmailAI] RAG fetch error:', e.message);
+        }
+
         const systemPrompt = `You are a strict AI assistant handling incoming emails for "${companyName}".
-Your goal is to determine if you can FULLY answer this email based ONLY on the provided context.
+Your goal is to determine if you can FULLY answer this email based ONLY on the provided context and past resolutions.
 
 CONTEXT/KNOWLEDGE:
 ${context}
+${pastResolutions}
 
 INCOMING EMAIL:
 From: ${email.from}

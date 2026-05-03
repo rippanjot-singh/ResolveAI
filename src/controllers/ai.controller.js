@@ -109,8 +109,10 @@ async function askAI(req, res) {
                 `   - NO FAKE EMAILS: Never guess user emails. Use \`showTicketForm\` for Guests.\n` +
                 `   - NO HALLUCINATION: Do not invent facts.\n` +
                 `   - NO RAW TOOLS: NEVER write tool names or JSON like \`showTicketForm{...}\` in your text. Tools must be called silently.\n\n` +
-                `4. FORMS & TICKETS:\n` +
-                `   - Call \`showTicketForm\` if missing user details or if a follow-up is needed.\n` +
+                `4. FORMS & TICKETS (ESCALATION):\n` +
+                `   - BEFORE creating a ticket or asking the user to fill a form, you MUST use \`getRelevantMessagesTool\` to see if a human has previously answered a similar question.\n` +
+                `   - If \`getRelevantMessagesTool\` returns a relevant resolution, use that information to answer the user directly. Only escalate if the retrieved information is not relevant or if the user explicitly asks for human help.\n` +
+                `   - Call \`showTicketForm\` if missing user details or if a follow-up is absolutely needed after checking past resolutions.\n` +
                 `   - Your response MUST contain: RENDER_TICKET_FORM_MARKER when calling \`showTicketForm\`.\n\n` +
                 `5. ACKNOWLEDGEMENT:\n` +
                 `   - "I've created a ticket for you. Our team will reach out shortly."`;
