@@ -4,6 +4,7 @@ const userModel = require('../models/user.model.js');
 const companyModel = require('../models/company.model.js');
 const { generateToken, setAuthCookie } = require('../utils/auth.utils.js');
 const { registerSchema, loginSchema } = require('../validators/auth.validator.js');
+const { decrypt } = require('../utils/crypto.utils.js');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
 
@@ -120,6 +121,15 @@ async function me(req, res) {
         if (!user) {
             return res.status(404).json({ message: "User not found", status: 'failed' });
         }
+
+        if (user.emailSettings) {
+            if (user.emailSettings.SmtpHost) user.emailSettings.SmtpHost = decrypt(user.emailSettings.SmtpHost);
+            if (user.emailSettings.User) user.emailSettings.User = decrypt(user.emailSettings.User);
+            if (user.emailSettings.Pass) user.emailSettings.Pass = decrypt(user.emailSettings.Pass);
+            if (user.emailSettings.SupportEmail) user.emailSettings.SupportEmail = decrypt(user.emailSettings.SupportEmail);
+            if (user.emailSettings.IMapHost) user.emailSettings.IMapHost = decrypt(user.emailSettings.IMapHost);
+        }
+
         return res.status(200).json({ message: "User verified successfully", status: 'success', user });
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", status: 'failed', error: error.message });

@@ -1,5 +1,6 @@
 const userModel = require('../models/user.model');
 const { fetchEmails } = require('../services/imap.service');
+const { decrypt } = require('../utils/crypto.utils.js');
 
 async function updateUser(req, res) {
     try {
@@ -36,6 +37,14 @@ async function updateUser(req, res) {
         // Save triggers the pre-save hooks in user.model.js
         // (Handles password hashing and emailSettings encryption)
         await user.save();
+
+        if (user.emailSettings) {
+            if (user.emailSettings.SmtpHost) user.emailSettings.SmtpHost = decrypt(user.emailSettings.SmtpHost);
+            if (user.emailSettings.User) user.emailSettings.User = decrypt(user.emailSettings.User);
+            if (user.emailSettings.Pass) user.emailSettings.Pass = decrypt(user.emailSettings.Pass);
+            if (user.emailSettings.SupportEmail) user.emailSettings.SupportEmail = decrypt(user.emailSettings.SupportEmail);
+            if (user.emailSettings.IMapHost) user.emailSettings.IMapHost = decrypt(user.emailSettings.IMapHost);
+        }
 
         res.status(200).json({
             success: true,
