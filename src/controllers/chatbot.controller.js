@@ -90,7 +90,7 @@ async function deleteChatbotController(req, res) {
 
 async function getWidgetConfigController(req, res) {
     try {
-        const chatbot = await chatBotModel.findById(req.params.id).select("name userId style welcomeMessage prompt model integrations position faq greeting verifiedDomains restrictedDomains isActive");
+        const chatbot = await chatBotModel.findById(req.params.id).select("name userId style welcomeMessage prompt model integrations position faq greeting verifiedDomains restrictedDomains isActive isMaster");
         if (!chatbot) return res.status(404).json({ success: false, message: "Not found" });
 
         // Explicitly block the widget from even loading its config on restricted domains

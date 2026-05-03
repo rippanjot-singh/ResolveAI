@@ -29,6 +29,7 @@ const updateChatbotSchema = z.object({
     faq: z.array(z.any()).optional(),
     position: z.enum(['bottom-right', 'bottom-left']).optional(),
     isActive: z.boolean().optional(),
+    isMaster: z.boolean().optional(),
     verifiedDomains: z.array(z.string()).optional(),
     restrictedDomains: z.array(z.string()).optional(),
     integrations: z.array(z.object({
