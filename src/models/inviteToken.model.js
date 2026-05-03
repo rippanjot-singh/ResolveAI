@@ -15,6 +15,9 @@ const inviteTokenSchema = new mongoose.Schema({
         required: [true, 'Role is required'],
         enum: ['admin', 'member'],
     },
+    speciality: {
+        type: String,
+    },
     expiresAt: {
         type: Date,
         required: [true, 'Expires at is required']

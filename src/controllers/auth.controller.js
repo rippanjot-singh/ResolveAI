@@ -20,16 +20,22 @@ async function userRegisterController(req, res) {
             return res.status(422).json({ message: "User already exists", status: 'failed' });
         }
 
+        if (!inviteToken && !companyName) {
+            return res.status(400).json({ message: "Company name is required", status: 'failed' });
+        }
+
         let role = '';
         let companyId = null;
+        let speciality = '';
 
         if (inviteToken) {
-            const inviteTokenData = await inviteTokenModel.findOne({ token: inviteToken });
-            if (!inviteTokenData) {
+            const inviteTokenData = await inviteTokenModel.findOne({ token: inviteToken, isActive: true });
+            if (!inviteTokenData || inviteTokenData.expiresAt < new Date()) {
                 return res.status(400).json({ message: "Invalid or expired invite token", status: 'failed' });
             }
             role = inviteTokenData.role;
             companyId = inviteTokenData.companyId;
+            speciality = inviteTokenData.speciality || '';
         } else {
             role = 'admin';
         }
@@ -40,6 +46,7 @@ async function userRegisterController(req, res) {
             email,
             password,
             role,
+            speciality,
             companyId // Will be null for new admins temporarily
         });
 
@@ -122,20 +129,29 @@ async function me(req, res) {
 async function createInviteTokenController(req, res) {
     try {
         const { userId } = req.user;
-        const { role } = req.body;
+        const { role, speciality } = req.body;
+
         const user = await userModel.findById(userId);
         if (!user) {
             return res.status(404).json({ message: "User not found", status: 'failed' })
         }
+
+        // Only admins can invite
+        if (user.role !== 'admin') {
+            return res.status(403).json({ message: "Only admins can invite members", status: 'failed' });
+        }
+
         const token = crypto.randomBytes(32).toString('hex');
         const inviteToken = await inviteTokenModel.create({
             companyId: user.companyId,
             token: token,
-            role: role,
-            expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+            role: role || 'member',
+            speciality: role === 'member' ? speciality : undefined,
+            expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // 2 days
         });
+
         const inviteTokenUrl = `${config.FRONTEND_URL}/signup?inviteToken=${token}`;
-        return res.status(200).json({ message: "Token created successfully", status: 'success', inviteTokenUrl })
+        return res.status(200).json({ message: "Token created successfully", status: 'success', inviteTokenUrl, token })
     } catch (error) {
         return res.status(500).json({ message: "Internal server error", status: 'failed', error: error.message })
     }
