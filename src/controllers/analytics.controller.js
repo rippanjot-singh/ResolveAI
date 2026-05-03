@@ -5,11 +5,20 @@ const mongoose = require('mongoose');
 async function getAnalytics(req, res) {
     try {
         const companyId = req.user?.companyId || req.companyId;
-        const { timeframe = '7d' } = req.query;
+        const { timeframe = '7d', chatbotId } = req.query;
 
-        // 1. Get all chatbot IDs for this company
-        const chatbots = await chatBotModel.find({ companyId }).select('_id');
-        const chatbotIds = chatbots.map(cb => cb._id);
+        // 1. Determine target chatbots
+        let chatbotIds = [];
+        let chatbots = [];
+        if (chatbotId) {
+            chatbotIds = [new mongoose.Types.ObjectId(chatbotId)];
+            chatbots = await chatBotModel.find({ _id: chatbotId, companyId }).select('_id name');
+        } else {
+            chatbots = await chatBotModel.find({ companyId }).select('_id name');
+            chatbotIds = chatbots.map(cb => cb._id);
+        }
+
+        const botNames = new Map(chatbots.map(b => [b._id.toString(), b.name]));
 
         if (chatbotIds.length === 0) {
             return res.status(200).json({
@@ -31,9 +40,9 @@ async function getAnalytics(req, res) {
         if (timeframe === '24h') startDate.setHours(startDate.getHours() - 24);
         else if (timeframe === '7d') startDate.setDate(startDate.getDate() - 7);
         else if (timeframe === '30d') startDate.setDate(startDate.getDate() - 30);
-        else startDate.setDate(startDate.getDate() - 7); // Default 7d
+        else startDate.setDate(startDate.getDate() - 7); 
 
-        // 3. Aggregate Daily Chats (Line Chart)
+        // 3. Aggregate Daily Chats (Multi-Line support)
         const rawDailyChats = await interactionModel.aggregate([
             {
                 $match: {
@@ -43,26 +52,45 @@ async function getAnalytics(req, res) {
             },
             {
                 $group: {
-                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    _id: {
+                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                        chatbotId: "$chatbotId"
+                    },
                     count: { $sum: 1 }
                 }
             },
-            { $sort: { "_id": 1 } }
+            { $sort: { "_id.date": 1 } }
         ]);
 
-        // Fill in gaps with 0
+        // Process for multi-line chart
+        // Structure: [{ date: '2024-01-01', bot1: 10, bot2: 5, total: 15 }]
         const dailyChats = [];
-        const dateMap = new Map(rawDailyChats.map(item => [item._id, item.count]));
+        const dateBotMap = new Map(); // 'date' -> { botId: count }
+
+        rawDailyChats.forEach(item => {
+            const date = item._id.date;
+            const bId = item._id.chatbotId.toString();
+            if (!dateBotMap.has(date)) dateBotMap.set(date, {});
+            dateBotMap.get(date)[bId] = item.count;
+        });
         
         let curr = new Date(startDate);
         const end = new Date();
         
         while (curr <= end) {
             const dateStr = curr.toISOString().split('T')[0];
-            dailyChats.push({
-                date: dateStr,
-                chats: dateMap.get(dateStr) || 0
+            const entry = { date: dateStr, total: 0 };
+            
+            const botCounts = dateBotMap.get(dateStr) || {};
+            chatbotIds.forEach(id => {
+                const bId = id.toString();
+                const name = botNames.get(bId) || bId;
+                const count = botCounts[bId] || 0;
+                entry[name] = count;
+                entry.total += count;
             });
+
+            dailyChats.push(entry);
             curr.setDate(curr.getDate() + 1);
         }
 
