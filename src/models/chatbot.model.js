@@ -104,6 +104,10 @@ const chatBotSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    isMaster: {
+        type: Boolean,
+        default: false
+    },
     verifiedDomains: {
         type: [String],
         default: []

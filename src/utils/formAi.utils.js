@@ -17,9 +17,17 @@ async function processFormSubmission(form, submission) {
         }
 
         const companyName = user.companyId?.name || user.name;
+        const targetCompanyId = user.companyId?._id || user.companyId;
 
         // Try to find a chatbot for this user to get context/knowledge
-        const chatbot = await chatBotModel.findOne({ companyId: user.companyId });
+        // Prioritize the designated "Master Agent"
+        let chatbot = await chatBotModel.findOne({ companyId: targetCompanyId, isMaster: true });
+        
+        // Fallback to any chatbot if no master is set
+        if (!chatbot) {
+            chatbot = await chatBotModel.findOne({ companyId: targetCompanyId });
+        }
+        
         const context = chatbot ? chatbot.prompt : user.speciality || "A professional assistant.";
 
         const formTitle = form.name;
@@ -33,7 +41,7 @@ async function processFormSubmission(form, submission) {
         // Fetch relevant past resolutions
         let pastResolutions = "";
         try {
-            const ragRes = await getReleventMessages(formData, user.companyId);
+            const ragRes = await getReleventMessages(formData, targetCompanyId);
             if (ragRes && ragRes.matches && ragRes.matches.length > 0) {
                 pastResolutions = "\nPAST HUMAN RESOLUTIONS (HIGH PRIORITY KNOWLEDGE):\n" + 
                     ragRes.matches.map(m => "- " + m.metadata.text).join('\n');
@@ -95,12 +103,19 @@ TICKET`;
             // Record: AI escalated, not resolved
             await formResultModel.findByIdAndUpdate(submission._id, {
                 'aiResponse.resolved': false
-            });
+            }, { returnDocument: 'after' });
         } else if (userEmail) {
             console.log(`[FormAI] Sending AI generated email response to ${userEmail}`);
-            const subjectMatch = aiContent.match(/Subject: (.*)/i);
-            const subject = subjectMatch ? subjectMatch[1] : `Re: ${formTitle}`;
-            const body = aiContent.replace(/Subject: .*/i, "").trim();
+            
+            // Robust extraction to handle Markdown (**Subject:**) and meta-labels (Email Content:)
+            const subjectMatch = aiContent.match(/(?:\*\*|#|)?Subject:(?:\*\*|)?\s*(.*)/i);
+            const subject = subjectMatch ? subjectMatch[1].replace(/\*\*/g, '').trim() : `Re: ${formTitle}`;
+            
+            let body = aiContent
+                .replace(/(?:\*\*|#|)?Subject:(?:\*\*|)?\s*.*/i, '')
+                .replace(/(?:\*\*|)?Email Content:(?:\*\*|)?/i, '')
+                .replace(/(?:\*\*|)?AI Response:(?:\*\*|)?/i, '')
+                .trim();
 
             await sendMail(userEmail, subject, body, body.replace(/\n/g, '<br>'), user.emailSettings);
             console.log(`[FormAI] Email sent successfully to ${userEmail}`);
@@ -110,7 +125,7 @@ TICKET`;
                 'aiResponse.resolved': true,
                 'aiResponse.reply': body,
                 'aiResponse.resolvedAt': new Date()
-            });
+            }, { returnDocument: 'after' });
         } else {
             console.warn(`[FormAI] AI generated content but no recipient email found in data.`);
         }

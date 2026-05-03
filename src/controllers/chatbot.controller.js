@@ -118,11 +118,38 @@ async function toggleChatBotStatusController(req, res) {
     }
 }
 
+async function setMasterChatbotController(req, res) {
+    try {
+        const { companyId } = req.user;
+        const { id } = req.params;
+
+        const chatbot = await chatBotModel.findOne({ _id: id, companyId });
+        if (!chatbot) {
+            return res.status(404).json({ success: false, message: "Chatbot not found or unauthorized" });
+        }
+
+        // Unset all other master chatbots for this company
+        await chatBotModel.updateMany(
+            { companyId, _id: { $ne: id } },
+            { $set: { isMaster: false } }
+        );
+
+        // Set this one as master
+        chatbot.isMaster = true;
+        await chatbot.save();
+
+        res.status(200).json({ success: true, message: "Master chatbot set successfully", data: chatbot });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
 module.exports = {
     createChatbotController,
     getMyChatbotsController,
     updateChatbotController,
     deleteChatbotController,
     getWidgetConfigController,
-    toggleChatBotStatusController
+    toggleChatBotStatusController,
+    setMasterChatbotController
 }

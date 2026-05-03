@@ -33,8 +33,9 @@ async function fetchUnseenEmails(emailSettings) {
             return [];
         }
 
-        console.log(`[IMAP] Found ${uids.length} UNSEEN email(s).`);
+        console.log(`[IMAP] Found ${uids.length} UNSEEN email(s). Fetching...`);
         const emails = [];
+        const fetchedUids = [];
 
         for await (let message of client.fetch(uids, { envelope: true, source: true }, { uid: true })) {
             emails.push({
@@ -46,6 +47,12 @@ async function fetchUnseenEmails(emailSettings) {
                 date: message.envelope.date,
                 body: message.source ? message.source.toString() : ''
             });
+            fetchedUids.push(message.uid);
+        }
+
+        // Mark all fetched emails as seen in one batch after the loop
+        if (fetchedUids.length > 0) {
+            await client.messageFlagsAdd(fetchedUids, ['\\Seen'], { uid: true });
         }
 
         emails.sort((a, b) => new Date(a.date) - new Date(b.date)); // oldest first

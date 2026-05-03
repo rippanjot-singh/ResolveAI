@@ -15,19 +15,28 @@ async function processIncomingEmail(user, email) {
         if (alreadyDone) return;
 
         const companyName = user.companyId?.name || user.name;
-        const chatbot = await chatBotModel.findOne({ companyId: user.companyId });
+        
+        // Prioritize the designated "Master Agent"
+        const targetCompanyId = user.companyId?._id || user.companyId;
+        let chatbot = await chatBotModel.findOne({ companyId: targetCompanyId, isMaster: true });
+        
+        // Fallback to any chatbot if no master is set
+        if (!chatbot) {
+            chatbot = await chatBotModel.findOne({ companyId: targetCompanyId });
+        }
+        
         const context = chatbot ? chatbot.prompt : user.speciality || 'A professional assistant.';
 
         try {
             await leadModel.findOneAndUpdate(
-                { companyId: user.companyId, email: email.from },
+                { companyId: targetCompanyId, email: email.from },
                 {
                     $set: {
                         name: email.from,
                         note: `lead captured from incoming email UID ${email.uid}. Subject: ${email.subject}`
                     }
                 },
-                { upsert: true, new: true }
+                { upsert: true, returnDocument: 'after' }
             );
         } catch (e) {
             console.error('[EmailAI] Failed to create lead for incoming email:', e.message);
@@ -40,7 +49,7 @@ async function processIncomingEmail(user, email) {
         // Fetch relevant past resolutions
         let pastResolutions = "";
         try {
-            const ragRes = await getReleventMessages(email.subject + " " + cleanBody, user.companyId);
+            const ragRes = await getReleventMessages(email.subject + " " + cleanBody, targetCompanyId);
             if (ragRes && ragRes.matches && ragRes.matches.length > 0) {
                 pastResolutions = "\nPAST HUMAN RESOLUTIONS (HIGH PRIORITY KNOWLEDGE):\n" + 
                     ragRes.matches.map(m => "- " + m.metadata.text).join('\n');
@@ -107,38 +116,54 @@ TICKET`;
             });
         } else {
             processingStatus = 'replied';
-            const subjectMatch = aiContent.match(/Subject: (.*)/i);
-            const subject = subjectMatch ? subjectMatch[1] : `Re: ${email.subject}`;
-            const body = aiContent.replace(/Subject: .*/i, '').trim();
+            
+            // Robust extraction to handle Markdown (**Subject:**) and meta-labels (Email Content:)
+            const subjectMatch = aiContent.match(/(?:\*\*|#|)?Subject:(?:\*\*|)?\s*(.*)/i);
+            const subject = subjectMatch ? subjectMatch[1].replace(/\*\*/g, '').trim() : `Re: ${email.subject}`;
+            
+            let body = aiContent
+                .replace(/(?:\*\*|#|)?Subject:(?:\*\*|)?\s*.*/i, '')
+                .replace(/(?:\*\*|)?Email Content:(?:\*\*|)?/i, '')
+                .replace(/(?:\*\*|)?AI Response:(?:\*\*|)?/i, '')
+                .trim();
+
             finalResponse = body;
 
             await sendMail(email.from, subject, body, body.replace(/\n/g, '<br>'), user.emailSettings);
             console.log(`[EmailAI] Reply sent to ${email.from} for UID ${email.uid}`);
         }
 
-        // Mark as processed regardless of outcome
-        await processedEmailModel.create({ 
-            userId: user._id, 
-            uid: email.uid,
-            from: email.from,
-            subject: email.subject,
-            status: processingStatus,
-            aiResponse: finalResponse || aiContent
-        });
+        // Mark as processed regardless of outcome - using updateOne with upsert to prevent duplicate key errors
+        await processedEmailModel.updateOne(
+            { userId: user._id, uid: email.uid },
+            { 
+                $set: {
+                    from: email.from,
+                    subject: email.subject,
+                    status: processingStatus,
+                    aiResponse: finalResponse || aiContent
+                }
+            },
+            { upsert: true }
+        );
 
     } catch (error) {
         console.error(`[EmailAI] Error processing email UID ${email.uid}:`, error.message);
         
         // Try to mark as error so we don't infinitely retry failing emails
         try {
-            await processedEmailModel.create({ 
-                userId: user._id, 
-                uid: email.uid,
-                from: email.from,
-                subject: email.subject,
-                status: 'error',
-                aiResponse: error.message
-            });
+            await processedEmailModel.updateOne(
+                { userId: user._id, uid: email.uid },
+                { 
+                    $set: {
+                        from: email.from,
+                        subject: email.subject,
+                        status: 'error',
+                        aiResponse: error.message
+                    }
+                },
+                { upsert: true }
+            );
         } catch (dbErr) {
             console.error(`[EmailAI] Failed to save error state for UID ${email.uid}:`, dbErr.message);
         }
