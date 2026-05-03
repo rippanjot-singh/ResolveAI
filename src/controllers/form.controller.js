@@ -60,7 +60,95 @@ async function submitPublicForm(req, res) {
     }
 }
 
-// Admin/Owner controllers (for later)
+// Admin/Owner controllers
+async function getAllForms(req, res) {
+    try {
+        const { companyId } = req.user;
+        const forms = await Form.find({ companyId }).sort({ createdAt: -1 });
+        res.json({ success: true, data: forms });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function toggleFormStatus(req, res) {
+    try {
+        const { formId } = req.params;
+        const form = await Form.findById(formId);
+        if (!form) return res.status(404).json({ success: false, message: "Form not found" });
+        
+        // Ensure user belongs to the same company
+        if (form.companyId.toString() !== req.user.companyId.toString()) {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        
+        form.isActive = !form.isActive;
+        await form.save();
+        res.json({ success: true, data: form });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function deleteForm(req, res) {
+    try {
+        const { formId } = req.params;
+        const form = await Form.findById(formId);
+        if (!form) return res.status(404).json({ success: false, message: "Form not found" });
+        
+        if (form.companyId.toString() !== req.user.companyId.toString()) {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        
+        await Form.findByIdAndDelete(formId);
+        // Also delete associated results
+        await FormResult.deleteMany({ formId });
+        
+        res.json({ success: true, message: "Form deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function getFormById(req, res) {
+    try {
+        const { formId } = req.params;
+        const form = await Form.findById(formId);
+        if (!form) return res.status(404).json({ success: false, message: "Form not found" });
+        
+        if (form.companyId.toString() !== req.user.companyId.toString()) {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        
+        res.json({ success: true, data: form });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function updateForm(req, res) {
+    try {
+        const { formId } = req.params;
+        const { name, description, fields } = req.body;
+        
+        const form = await Form.findById(formId);
+        if (!form) return res.status(404).json({ success: false, message: "Form not found" });
+        
+        if (form.companyId.toString() !== req.user.companyId.toString()) {
+            return res.status(403).json({ success: false, message: "Unauthorized" });
+        }
+        
+        form.name = name || form.name;
+        form.description = description !== undefined ? description : form.description;
+        form.fields = fields || form.fields;
+        
+        await form.save();
+        res.json({ success: true, message: "Form updated successfully", data: form });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
 async function getFormResults(req, res) {
     try {
         const { formId } = req.params;
@@ -106,5 +194,10 @@ async function createForm(req, res) {
 module.exports = {
     submitPublicForm,
     getFormResults,
-    createForm
+    createForm,
+    getAllForms,
+    toggleFormStatus,
+    deleteForm,
+    getFormById,
+    updateForm
 };
