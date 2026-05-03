@@ -247,7 +247,7 @@ async function resolveTicketController(req, res) {
 
         // sendMail signature: to, subject, text, html
         // passing plain text version as 3rd arg, HTML as 4th arg
-        await sendMail(ticket.email, mailSubject, replyContent, replyContent);
+        await sendMail(ticket.email, mailSubject, replyContent, replyContent, user.emailSettings);
 
         const updatedTicket = await ticketModel.findByIdAndUpdate(
             ticketId,
