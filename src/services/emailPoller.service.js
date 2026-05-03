@@ -22,12 +22,27 @@ async function bootstrapUser(user) {
     }
 }
 
+const cacheService = require('./cache.service');
+
 async function pollAllUsers() {
     console.log('[EmailPoller] Running inbox poll...');
     try {
-        const users = await userModel.find({
-            'emailSettings.IMapHost': { $exists: true, $ne: null }
-        }).populate('companyId');
+        const CACHE_KEY = 'cache:system:imap_users';
+        let users = await cacheService.get(CACHE_KEY);
+
+        if (!users) {
+            console.log('[EmailPoller] Cache miss for IMAP users, fetching from MongoDB...');
+            users = await userModel.find({
+                'emailSettings.IMapHost': { $exists: true, $ne: null }
+            }).populate('companyId').lean(); // Use lean() for pure JSON caching
+
+            // Cache for 30 minutes to reduce DB load, saves memory
+            if (users.length > 0) {
+                await cacheService.set(CACHE_KEY, users, 1800);
+            }
+        } else {
+            console.log('[EmailPoller] Served IMAP users from Redis Cache.');
+        }
 
         console.log(`[EmailPoller] Found ${users.length} user(s) with IMAP configured.`);
 

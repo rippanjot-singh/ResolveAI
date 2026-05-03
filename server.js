@@ -5,7 +5,10 @@ const { connectDB } = require("./src/config/db.js");
 const { startEmailPoller } = require("./src/services/emailPoller.service.js");
 const socketUtil = require('./src/utils/socket.js');
 
+const { connectRedis } = require("./src/config/redis.js");
+
 connectDB();
+connectRedis();
 startEmailPoller();
 
 const server = http.createServer(app);

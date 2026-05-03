@@ -49,7 +49,25 @@ if (!process.env.PINECONE_API_KEY) {
     throw new Error("PINECONE_API_KEY is not defined in environment variables")
 }
 
+if (!process.env.NOTION_CLIENT_ID) {
+    throw new Error("NOTION_CLIENT_ID is not defined in environment variables")
+}
 
+if (!process.env.NOTION_CLIENT_SECRET) {
+    throw new Error("NOTION_CLIENT_SECRET is not defined in environment variables")
+}
+
+if (!process.env.REDIS_HOST) {
+    throw new Error("REDIS_HOST is not defined in environment variables")
+}
+
+if (!process.env.REDIS_PORT) {
+    throw new Error("REDIS_PORT is not defined in environment variables")
+}
+
+if (!process.env.REDIS_PASSWORD) {
+    throw new Error("REDIS_PASSWORD is not defined in environment variables")
+}
 
 const config = {
     PORT: process.env.PORT || 8080,
@@ -65,7 +83,12 @@ const config = {
     EMAIL_PASS: process.env.EMAIL_PASS,
     SUPPORT_EMAIL: process.env.SUPPORT_EMAIL,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
-    PINECONE_API_KEY: process.env.PINECONE_API_KEY
+    PINECONE_API_KEY: process.env.PINECONE_API_KEY,
+    NOTION_CLIENT_ID: process.env.NOTION_CLIENT_ID,
+    NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET,
+    REDIS_HOST: process.env.REDIS_HOST,
+    REDIS_PORT: process.env.REDIS_PORT,
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD
 }
 
 module.exports = config

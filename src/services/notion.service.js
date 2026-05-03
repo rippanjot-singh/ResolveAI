@@ -1,9 +1,10 @@
 const axios = require('axios');
 const { Client } = require('@notionhq/client');
+const config = require('../config/config');
 
-const NOTION_CLIENT_ID = process.env.NOTION_CLIENT_ID;
-const NOTION_CLIENT_SECRET = process.env.NOTION_CLIENT_SECRET;
-const REDIRECT_URI = `${process.env.BACKEND_URL}/api/notion/callback`;
+const NOTION_CLIENT_ID = config.NOTION_CLIENT_ID;
+const NOTION_CLIENT_SECRET = config.NOTION_CLIENT_SECRET;
+const REDIRECT_URI = `${config.BACKEND_URL}/api/notion/callback`;
 
 class NotionService {
     getAuthUrl() {

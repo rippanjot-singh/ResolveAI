@@ -1,6 +1,7 @@
 const userModel = require('../models/user.model');
 const { fetchEmails } = require('../services/imap.service');
 const { decrypt } = require('../utils/crypto.utils.js');
+const cacheService = require('../services/cache.service');
 
 async function updateUser(req, res) {
     try {
@@ -28,15 +29,22 @@ async function updateUser(req, res) {
             'speciality', 'emailSettings'
         ];
 
+        let invalidateImapCache = false;
+
         Object.keys(updates).forEach(key => {
             if (allowedUpdates.includes(key)) {
                 user[key] = updates[key];
+                if (key === 'emailSettings') invalidateImapCache = true;
             }
         });
 
         // Save triggers the pre-save hooks in user.model.js
         // (Handles password hashing and emailSettings encryption)
         await user.save();
+
+        if (invalidateImapCache) {
+            await cacheService.delete('cache:system:imap_users');
+        }
 
         if (user.emailSettings) {
             if (user.emailSettings.SmtpHost) user.emailSettings.SmtpHost = decrypt(user.emailSettings.SmtpHost);
