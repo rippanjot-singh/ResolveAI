@@ -10,6 +10,7 @@ router.post('/submit/:formId', formController.submitPublicForm);
 router.post('/create', authMiddleware, formController.createForm);
 
 // Private route for viewing results
+router.get('/results/all', authMiddleware, formController.getAllFormResults);
 router.get('/results/:formId', authMiddleware, formController.getFormResults);
 
 // Get all forms

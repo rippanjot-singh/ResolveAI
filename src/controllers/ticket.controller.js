@@ -26,7 +26,8 @@ async function createTicketController(req, res) {
             inquiree,
             assignedTo,
             priority,
-            priorityLevel
+            priorityLevel,
+            type: 'manual'
         });
 
         const lead = await leadModel.create({
@@ -38,7 +39,10 @@ async function createTicketController(req, res) {
 
         // Emit socket event to company room
         try {
-            getIO().to(companyId.toString()).emit('new_ticket', ticket);
+            const io = getIO();
+            const room = companyId.toString();
+            io.to(room).emit('new_ticket', ticket);
+            io.to(room).emit('new_lead', lead);
         } catch (err) {
             console.error('Socket emit error:', err);
         }
@@ -73,10 +77,20 @@ async function getAllTicketsController(req, res) {
                             ],
                             default: 0
                         }
+                    },
+                    statusWeight: {
+                        $switch: {
+                            branches: [
+                                { case: { $eq: ["$status", "open"] }, then: 3 },
+                                { case: { $eq: ["$status", "pending"] }, then: 2 },
+                                { case: { $eq: ["$status", "closed"] }, then: 1 }
+                            ],
+                            default: 0
+                        }
                     }
                 }
             },
-            { $sort: { status: 1, priorityWeight: -1, createdAt: 1 } }
+            { $sort: { statusWeight: -1, priorityWeight: -1, createdAt: 1 } }
         ]);
         return res.status(200).json({
             message: "Tickets fetched successfully",
@@ -177,10 +191,11 @@ async function resolveTicketController(req, res) {
         }
 
         const replyContent = html || response;
+        const mailSubject = subject || `Resolution: Your Inquiry #${ticketId.slice(-6).toUpperCase()}`;
 
         // sendMail signature: to, subject, text, html
         // passing plain text version as 3rd arg, HTML as 4th arg
-        await sendMail(ticket.email, subject, replyContent, replyContent);
+        await sendMail(ticket.email, mailSubject, replyContent, replyContent);
 
         const updatedTicket = await ticketModel.findByIdAndUpdate(
             ticketId,
@@ -212,11 +227,37 @@ async function resolveTicketController(req, res) {
     }
 }
 
+async function bulkDeleteTicketsController(req, res) {
+    try {
+        const { ticketIds } = req.body;
+        if (!ticketIds || !Array.isArray(ticketIds)) {
+            return res.status(400).json({
+                message: "Ticket IDs array is required",
+                status: "failed"
+            });
+        }
+
+        await ticketModel.deleteMany({ _id: { $in: ticketIds } });
+
+        return res.status(200).json({
+            message: "Tickets deleted successfully",
+            status: "success"
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Internal server error",
+            status: "failed",
+            error: error.message
+        });
+    }
+}
+
 module.exports = {
     createTicketController,
     getAllTicketsController,
     getTicketController,
     deleteTicketController,
+    bulkDeleteTicketsController,
     updateTicketController,
     resolveTicketController
 };

@@ -39,8 +39,8 @@ const ticketSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ['chatbot', 'form', 'email', 'other'],
-        default: 'chatbot'
+        enum: ['chatbot', 'form', 'email', 'manual', 'other'],
+        default: 'manual'
     },
     response: {
         type: String,

@@ -3,6 +3,7 @@ const chatBotModel = require('../models/chatbot.model');
 const ticketModel = require('../models/ticket.model');
 const leadModel = require('../models/lead.model');
 const interactionModel = require('../models/interaction.model');
+const { getIO } = require('../utils/socket');
 
 async function initChat(req, res) {
     try {
@@ -29,6 +30,20 @@ async function initChat(req, res) {
             email,
             note: `lead captured from chatbot ${chatbotId}`
         })
+        
+        // Emit socket event
+        try {
+            const io = getIO();
+            const room = chatbot.companyId.toString();
+            io.to(room).emit('new_chat', {
+                ...chat.toObject(),
+                chatbotId: { _id: chatbot._id, name: chatbot.name },
+                interactionCount: 0
+            });
+            io.to(room).emit('new_lead', lead);
+        } catch (err) {
+            console.error("Socket emit error:", err);
+        }
 
         res.status(201).json({
             success: true,

@@ -5,6 +5,7 @@ const {
     getAllTicketsController, 
     getTicketController, 
     deleteTicketController, 
+    bulkDeleteTicketsController,
     updateTicketController,
     resolveTicketController
 } = require('../controllers/ticket.controller');
@@ -14,6 +15,7 @@ router.post('/create', authMiddleware, createTicketController);
 router.get('/all', authMiddleware, getAllTicketsController);
 router.get('/:ticketId', authMiddleware, getTicketController);
 router.delete('/delete/:ticketId', authMiddleware, deleteTicketController);
+router.post('/bulk-delete', authMiddleware, bulkDeleteTicketsController);
 router.patch('/update/:ticketId', authMiddleware, updateTicketController);
 router.patch('/resolve/:ticketId', authMiddleware, resolveTicketController);
 

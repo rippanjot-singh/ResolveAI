@@ -1,6 +1,7 @@
 const Form = require('../models/form.model');
 const FormResult = require('../models/formResults.model');
 const leadModel = require('../models/lead.model');
+const { getIO } = require('../utils/socket');
 
 async function submitPublicForm(req, res) {
     try {
@@ -41,6 +42,19 @@ async function submitPublicForm(req, res) {
         // Background: Process submission with AI (don't await to avoid blocking response)
         const { processFormSubmission } = require('../utils/formAi.utils');
         processFormSubmission(form, result).catch(err => console.error("Form AI processing failed:", err));
+
+        // Emit socket event
+        try {
+            const io = getIO();
+            const room = form.companyId.toString();
+            io.to(room).emit('new_submission', {
+                ...result.toObject(),
+                formId: { _id: form._id, name: form.name }
+            });
+            io.to(room).emit('new_lead', lead);
+        } catch (err) {
+            console.error("Socket emit error:", err);
+        }
 
         // If it's a standard form submission (not AJAX), redirect back to the referrer
         const referrer = req.get('Referrer');
@@ -152,7 +166,19 @@ async function updateForm(req, res) {
 async function getFormResults(req, res) {
     try {
         const { formId } = req.params;
-        const results = await FormResult.find({ formId }).sort({ createdAt: -1 });
+        const results = await FormResult.find({ formId }).populate('formId', 'name').sort({ createdAt: -1 });
+        res.json({ success: true, data: results });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+}
+
+async function getAllFormResults(req, res) {
+    try {
+        const { companyId } = req.user;
+        const forms = await Form.find({ companyId });
+        const formIds = forms.map(f => f._id);
+        const results = await FormResult.find({ formId: { $in: formIds } }).populate('formId', 'name').sort({ createdAt: -1 });
         res.json({ success: true, data: results });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -194,6 +220,7 @@ async function createForm(req, res) {
 module.exports = {
     submitPublicForm,
     getFormResults,
+    getAllFormResults,
     createForm,
     getAllForms,
     toggleFormStatus,
