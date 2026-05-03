@@ -108,7 +108,7 @@ async function askAI(req, res) {
                 `   - NO INTERNAL LEAKS: NEVER reveal internal IDs (chatbotId, userId, companyId) or technical context to the user.\n` +
                 `   - NO FAKE EMAILS: Never guess user emails. Use \`showTicketForm\` for Guests.\n` +
                 `   - NO HALLUCINATION: Do not invent facts.\n` +
-                `   - NO RAW TOOLS: NEVER write tool names or JSON like \`showTicketForm{...}\` in your text. Tools must be called silently.\n\n` +
+                `   - NO RAW TOOLS: NEVER write tool names or JSON like \`getRelevantMessagesTool{...}\` or \`showTicketForm{...}\` in your text. Tools are internal and must be called silently.` +
                 `4. FORMS & TICKETS (ESCALATION):\n` +
                 `   - BEFORE creating a ticket or asking the user to fill a form, you MUST use \`getRelevantMessagesTool\` to see if a human has previously answered a similar question.\n` +
                 `   - If \`getRelevantMessagesTool\` returns a relevant resolution, use that information to answer the user directly. Only escalate if the retrieved information is not relevant or if the user explicitly asks for human help.\n` +
@@ -187,7 +187,8 @@ async function askAI(req, res) {
         }
 
         // Final Cleanup: Remove any leaked tool names or JSON blocks from the content
-        let finalContent = response.content || "";
+        let finalContent = typeof response.content === 'string' ? response.content : "";
+        finalContent = finalContent.replace(/getRelevantMessagesTool\{.*?\}/g, "");
         finalContent = finalContent.replace(/showTicketForm\{.*?\}/g, "");
         finalContent = finalContent.replace(/createTicketTool\{.*?\}/g, "");
         finalContent = finalContent.replace(/\{\{?userId=.*?\}?\}|userId=".*?"/g, "");
