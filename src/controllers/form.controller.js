@@ -32,12 +32,16 @@ async function submitPublicForm(req, res) {
                 referrer: req.get('Referrer')
             }
         });
-        const lead = await leadModel.create({
-            companyId: form.companyId,
-            name: data.name,
-            email: data.email,
-            note: `lead captured from form ${formId}. [RESULT: ${JSON.stringify(data)}]`
-        })
+        const lead = await leadModel.findOneAndUpdate(
+            { companyId: form.companyId, email: data.email },
+            {
+                $set: {
+                    name: data.name,
+                    note: `lead captured from form ${formId}. [RESULT: ${JSON.stringify(data)}]`
+                }
+            },
+            { upsert: true, new: true }
+        );
 
         // Background: Process submission with AI (don't await to avoid blocking response)
         const { processFormSubmission } = require('../utils/formAi.utils');

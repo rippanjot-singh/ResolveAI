@@ -39,12 +39,16 @@ async function createTicketController(req, res) {
             type: 'manual'
         });
 
-        const lead = await leadModel.create({
-            companyId,
-            name,
-            email,
-            note: `lead created manually. [TICKET: ${ticket._id}] [INQUIREE: ${inquiree}]`
-        })
+        const lead = await leadModel.findOneAndUpdate(
+            { companyId, email },
+            {
+                $set: {
+                    name,
+                    note: `lead created manually. [TICKET: ${ticket._id}] [INQUIREE: ${inquiree}]`
+                }
+            },
+            { upsert: true, new: true }
+        );
 
         // Emit socket event to company room
         try {

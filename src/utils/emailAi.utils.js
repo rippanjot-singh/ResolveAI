@@ -19,12 +19,16 @@ async function processIncomingEmail(user, email) {
         const context = chatbot ? chatbot.prompt : user.speciality || 'A professional assistant.';
 
         try {
-            await leadModel.create({
-                companyId: user.companyId,
-                name: email.from,
-                email: email.from,
-                note: `lead captured from incoming email UID ${email.uid}. Subject: ${email.subject}`
-            });
+            await leadModel.findOneAndUpdate(
+                { companyId: user.companyId, email: email.from },
+                {
+                    $set: {
+                        name: email.from,
+                        note: `lead captured from incoming email UID ${email.uid}. Subject: ${email.subject}`
+                    }
+                },
+                { upsert: true, new: true }
+            );
         } catch (e) {
             console.error('[EmailAI] Failed to create lead for incoming email:', e.message);
         }

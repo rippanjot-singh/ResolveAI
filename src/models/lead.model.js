@@ -7,9 +7,14 @@ const leadSchema = new mongoose.Schema({
         required: true
     },
     name: String,
-    email: String,
+    email: {
+        type: String,
+        required: true
+    },
     note: String
 }, { timestamps: true });
+
+leadSchema.index({ companyId: 1, email: 1 }, { unique: true });
 
 const leadModel = mongoose.model('lead', leadSchema);
 

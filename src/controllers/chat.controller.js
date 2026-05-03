@@ -24,12 +24,16 @@ async function initChat(req, res) {
             email
         });
 
-        const lead = await leadModel.create({
-            companyId: chatbot.companyId,
-            name,
-            email,
-            note: `lead captured from chatbot ${chatbotId}`
-        })
+        const lead = await leadModel.findOneAndUpdate(
+            { companyId: chatbot.companyId, email },
+            {
+                $set: {
+                    name,
+                    note: `lead captured from chatbot ${chatbotId}`
+                }
+            },
+            { upsert: true, new: true }
+        );
         
         // Emit socket event
         try {
