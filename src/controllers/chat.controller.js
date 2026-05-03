@@ -68,7 +68,14 @@ async function createPublicTicket(req, res) {
         }
 
         const chat = await chatModel.findById(chatId);
+        if (!chat) {
+            return res.status(404).json({ success: false, message: "Chat session not found" });
+        }
+
         const chatbot = await chatBotModel.findById(chat.chatbotId);
+        if (!chatbot) {
+            return res.status(404).json({ success: false, message: "Chatbot configuration not found" });
+        }
 
         const ticket = await ticketModel.create({
             companyId: chatbot.companyId,
