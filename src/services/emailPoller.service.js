@@ -9,13 +9,16 @@ async function bootstrapUser(user) {
     const existingCount = await processedEmailModel.countDocuments({ userId: user._id });
     if (existingCount > 0) return; // already bootstrapped
 
-    console.log(`[EmailPoller] Bootstrapping ${user.email} — marking existing emails as processed...`);
+    const { decrypt } = require('../utils/crypto.utils');
+    const supportEmail = user.emailSettings?.SupportEmail ? decrypt(user.emailSettings.SupportEmail) : (user.emailSettings?.User ? decrypt(user.emailSettings.User) : user.email);
+
+    console.log(`[EmailPoller] Bootstrapping ${supportEmail} — marking existing emails as processed...`);
     const allUids = await fetchAllUids(user.emailSettings);
 
     if (allUids.length > 0) {
         const docs = allUids.map(uid => ({ userId: user._id, uid }));
         await processedEmailModel.insertMany(docs, { ordered: false }).catch(() => {}); // ignore duplicate key errors
-        console.log(`[EmailPoller] Bootstrapped ${allUids.length} existing email(s) for ${user.email}. Future emails only.`);
+        console.log(`[EmailPoller] Bootstrapped ${allUids.length} existing email(s) for ${supportEmail}. Future emails only.`);
     }
 }
 
@@ -30,6 +33,9 @@ async function pollAllUsers() {
 
         for (const user of users) {
             try {
+                const { decrypt } = require('../utils/crypto.utils');
+                const supportEmail = user.emailSettings?.SupportEmail ? decrypt(user.emailSettings.SupportEmail) : (user.emailSettings?.User ? decrypt(user.emailSettings.User) : user.email);
+
                 // Step 1: Bootstrap if this is the first time we're seeing this user
                 await bootstrapUser(user);
 
@@ -38,7 +44,7 @@ async function pollAllUsers() {
 
                 if (emails.length === 0) continue;
 
-                console.log(`[EmailPoller] Processing ${emails.length} new email(s) for ${user.email}...`);
+                console.log(`[EmailPoller] Processing ${emails.length} new email(s) for ${supportEmail}...`);
                 for (const email of emails) {
                     await processIncomingEmail(user, email);
                 }
@@ -51,9 +57,37 @@ async function pollAllUsers() {
     }
 }
 
-function startEmailPoller() {
-    cron.schedule('*/10 * * * *', pollAllUsers);
-    console.log('[EmailPoller] Inbox poller started (every 5 minutes).');
+async function pollSpecificUser(userId) {
+    try {
+        const user = await userModel.findById(userId).populate('companyId');
+        if (!user || !user.emailSettings || !user.emailSettings.IMapHost) {
+            console.log(`[EmailPoller] Skipping manual poll for user ${userId} — no IMAP.`);
+            return;
+        }
+
+        const { decrypt } = require('../utils/crypto.utils');
+        const supportEmail = user.emailSettings?.SupportEmail ? decrypt(user.emailSettings.SupportEmail) : (user.emailSettings?.User ? decrypt(user.emailSettings.User) : user.email);
+
+        console.log(`[EmailPoller] Manual poll triggered for ${supportEmail}...`);
+        await bootstrapUser(user);
+        const emails = await fetchUnseenEmails(user.emailSettings);
+
+        if (emails.length > 0) {
+            console.log(`[EmailPoller] Manual poll found ${emails.length} new email(s) for ${supportEmail}.`);
+            for (const email of emails) {
+                await processIncomingEmail(user, email);
+            }
+        } else {
+            console.log(`[EmailPoller] Manual poll finished for ${supportEmail} — no new emails.`);
+        }
+    } catch (error) {
+        console.error(`[EmailPoller] Manual poll error for user ${userId}:`, error.message);
+    }
 }
 
-module.exports = { startEmailPoller };
+function startEmailPoller() {
+    cron.schedule('*/10 * * * *', pollAllUsers);
+    console.log('[EmailPoller] Inbox poller started (every 10 minutes).');
+}
+
+module.exports = { startEmailPoller, pollSpecificUser };
