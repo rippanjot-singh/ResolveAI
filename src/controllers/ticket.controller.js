@@ -230,7 +230,7 @@ async function updateTicketController(req, res) {
 async function resolveTicketController(req, res) {
     try {
         const { ticketId } = req.params;
-        const { subject, html, response } = req.body;
+        const { subject, html, response, trainAi = true } = req.body;
         const { userId } = req.user;
         const user = await userModel.findById(userId);
 
@@ -257,7 +257,9 @@ async function resolveTicketController(req, res) {
             { new: true, runValidators: true }
         );
 
-        chatRag(ticket.inquiree, replyContent, user.companyId)
+        if (trainAi) {
+            chatRag(ticket.inquiree, replyContent, user.companyId);
+        }
 
         // Emit socket event
         try {
