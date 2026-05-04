@@ -1,4 +1,5 @@
 const userModel = require('../models/user.model');
+const companyModel = require('../models/company.model');
 const { fetchEmails } = require('../services/imap.service');
 const { decrypt } = require('../utils/crypto.utils.js');
 const cacheService = require('../services/cache.service');
@@ -14,10 +15,15 @@ async function updateUser(req, res) {
             return res.status(404).json({ success: false, message: "User not found" });
         }
 
-        // Role restriction: Only an admin can change any user's role
+        // Role restriction: Only an admin can change roles
         if (updates.role && updates.role !== user.role) {
             if (currentUser.role !== 'admin') {
                 return res.status(403).json({ success: false, message: "Forbidden: Only admins can change user roles" });
+            }
+            
+            // Prevent self-role modification
+            if (id === currentUser.userId.toString()) {
+                return res.status(400).json({ success: false, message: "Bad Request: You cannot change your own role" });
             }
         }
 
@@ -72,8 +78,7 @@ async function updateUser(req, res) {
 
 async function getCompanyUsers(req, res){
     try {
-        const { companyId } = req.params;
-        const users = await userModel.find({ companyId });
+        const users = await userModel.find({ companyId: req.user.companyId });
         res.status(200).json({
             success: true,
             message: "Users fetched successfully",
@@ -117,4 +122,77 @@ async function getUserEmails(req, res) {
     }
 }
 
-module.exports = { updateUser, getCompanyUsers, getUserEmails };
+async function deleteUser(req, res) {
+    try {
+        const { id } = req.params;
+        const currentUser = req.user;
+
+        if (currentUser.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Forbidden: Only admins can delete users" });
+        }
+
+        const userToDelete = await userModel.findById(id);
+        if (!userToDelete) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        if (userToDelete.companyId.toString() !== currentUser.companyId.toString()) {
+            return res.status(403).json({ success: false, message: "Forbidden: You can only delete users from your own company" });
+        }
+
+        // Prevent admin from deleting themselves (optional but recommended)
+        if (id === currentUser.userId.toString()) {
+            return res.status(400).json({ success: false, message: "Bad Request: You cannot delete yourself" });
+        }
+
+        await userModel.findByIdAndDelete(id);
+
+        res.status(200).json({
+            success: true,
+            message: "User deleted successfully"
+        });
+    } catch (error) {
+        console.error("Delete User Error:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Internal server error", 
+            error: error.message 
+        });
+    }
+}
+
+async function updateCompany(req, res) {
+    try {
+        const { name } = req.body;
+        const currentUser = req.user;
+
+        if (currentUser.role !== 'admin') {
+            return res.status(403).json({ success: false, message: "Forbidden: Only admins can update company details" });
+        }
+
+        const company = await companyModel.findByIdAndUpdate(
+            currentUser.companyId,
+            { name },
+            { new: true }
+        );
+
+        if (!company) {
+            return res.status(404).json({ success: false, message: "Company not found" });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Company updated successfully",
+            data: company
+        });
+    } catch (error) {
+        console.error("Update Company Error:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: "Internal server error", 
+            error: error.message 
+        });
+    }
+}
+
+module.exports = { updateUser, getCompanyUsers, getUserEmails, deleteUser, updateCompany };
