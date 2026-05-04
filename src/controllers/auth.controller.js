@@ -7,6 +7,7 @@ const { registerSchema, loginSchema } = require('../validators/auth.validator.js
 const { decrypt } = require('../utils/crypto.utils.js');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const googleService = require('../services/google.service.js');
 
 
 //-------------- REGISTER USER --------------//
@@ -167,12 +168,57 @@ async function createInviteTokenController(req, res) {
     }
 }
 
+async function googleAuthUrl(req, res) {
+    const url = googleService.getGoogleAuthUrl();
+    res.redirect(url);
+}
+
+async function googleCallbackController(req, res) {
+    try {
+        const { code } = req.query;
+        const payload = await googleService.getGoogleUser(code);
+        const { email, name } = payload;
+
+        let user = await userModel.findOne({ email });
+
+        if (!user) {
+            // Create new user and company
+            user = await userModel.create({
+                name,
+                email,
+                isGoogleUser: true,
+                role: 'admin',
+                isOnboarded: false
+            });
+
+            const company = await companyModel.create({
+                name: `${name}'s Company`,
+                userId: user._id
+            });
+
+            user.companyId = company._id;
+            await user.save();
+        }
+
+        const token = generateToken(user);
+        setAuthCookie(res, token);
+
+        // Redirect to frontend dashboard or onboarding
+        return res.redirect(`${config.FRONTEND_URL}/dashboard`);
+    } catch (error) {
+        console.error('Google Auth Error:', error);
+        return res.redirect(`${config.FRONTEND_URL}/login?error=google_auth_failed`);
+    }
+}
+
 
 module.exports = {
     userRegisterController,
     userLoginController,
     userLogoutController,
     me,
-    createInviteTokenController
+    createInviteTokenController,
+    googleAuthUrl,
+    googleCallbackController
 };
 

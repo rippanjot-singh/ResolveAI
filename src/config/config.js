@@ -91,7 +91,10 @@ const config = {
     REDIS_HOST: process.env.REDIS_HOST,
     REDIS_PORT: process.env.REDIS_PORT,
     REDIS_PASSWORD: process.env.REDIS_PASSWORD,
-    NODE_ENV: process.env.NODE_ENV
+    NODE_ENV: process.env.NODE_ENV,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI
 }
 
 module.exports = config

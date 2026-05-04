@@ -13,6 +13,7 @@ const notionRoutes = require('./routes/notion.routes.js');
 const analyticsRoutes = require('./routes/analytics.routes.js');
 const leadRoutes = require('./routes/lead.routes.js');
 const emailRoutes = require('./routes/email.routes.js');
+const googleRoutes = require('./routes/google.routes.js');
 const path = require('path');
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api/notion', notionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/email', emailRoutes);
+app.use('/api/google', googleRoutes);
 
 app.use(express.static(path.join(__dirname, "..", "public")));
 app.use("/widget", express.static(path.join(__dirname, "..", "widget")));

@@ -267,6 +267,7 @@ Do not include commentary.
 Only output the system prompt.
 
 Now use the following business information to generate the system prompt, the following information is scrapped data of the website in very raw format: 
+The prompt should be well structure and very very very detailed.
 `;
 
 async function makePromptwithWebsiteData(req, res) {
