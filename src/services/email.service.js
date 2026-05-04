@@ -5,6 +5,7 @@ const { decrypt } = require("../utils/crypto.utils");
 const defaultTransporter = nodemailer.createTransport({
   host: config.SMTP_HOST,
   port: config.SMTP_PORT,
+  family: 4,
   secure: true,
   auth: {
     user: config.EMAIL_USER,
@@ -22,6 +23,7 @@ async function sendMail(to, subject, text, html, userEmailConfig = null) {
       transporter = nodemailer.createTransport({
         host: decrypt(userEmailConfig.SmtpHost),
         port: userEmailConfig.SmtpPort || 465,
+        family: 4,
         secure: true,
         auth: {
           user: decrypt(userEmailConfig.User),

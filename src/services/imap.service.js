@@ -6,6 +6,7 @@ function buildClient(emailSettings) {
         host: decrypt(emailSettings.IMapHost),
         port: parseInt(emailSettings.ImapPort) || 993,
         secure: true,
+        family: 4,
         auth: {
             user: decrypt(emailSettings.User),
             pass: decrypt(emailSettings.Pass)
