@@ -20,7 +20,10 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(cors({
-    origin: true,
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        return callback(null, origin);
+    },
     credentials: true,
 }));
 
