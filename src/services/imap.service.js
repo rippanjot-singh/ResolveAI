@@ -1,5 +1,6 @@
 const { ImapFlow } = require('imapflow');
 const { decrypt } = require('../utils/crypto.utils');
+const dns = require('dns');
 
 function buildClient(emailSettings) {
     return new ImapFlow({

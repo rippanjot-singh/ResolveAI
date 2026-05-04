@@ -1,4 +1,5 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
 const config = require("../config/config");
 const { decrypt } = require("../utils/crypto.utils");
 
@@ -14,6 +15,9 @@ const defaultTransporter = nodemailer.createTransport({
   connectionTimeout: 10000, // 10 seconds
   greetingTimeout: 10000,
   socketTimeout: 15000,
+  dnsLookup: (hostname, options, callback) => {
+    dns.lookup(hostname, { family: 4 }, callback);
+  },
   tls: {
     rejectUnauthorized: false, // Helps with some cloud hosting certificate issues
   },
@@ -38,6 +42,9 @@ async function sendMail(to, subject, text, html, userEmailConfig = null) {
         connectionTimeout: 10000,
         greetingTimeout: 10000,
         socketTimeout: 15000,
+        dnsLookup: (hostname, options, callback) => {
+          dns.lookup(hostname, { family: 4 }, callback);
+        },
         tls: {
           rejectUnauthorized: false,
         },
