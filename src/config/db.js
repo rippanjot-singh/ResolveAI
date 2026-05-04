@@ -12,19 +12,21 @@ const connectDB = async () => {
   }
 };
 
+let indexInstance = null;
+
 const vectorDB = async () => {
   try {
-
-    const pc = new Pinecone({
-      apiKey: config.PINECONE_API_KEY
-    });
-
-    const index = pc.Index("resolveai");
-    return index;
-
+    if (!indexInstance) {
+      const pc = new Pinecone({
+        apiKey: config.PINECONE_API_KEY
+      });
+      indexInstance = pc.Index("resolveai");
+      console.log("Pinecone Index initialized");
+    }
+    return indexInstance;
   } catch (error) {
     console.error("vector db connection failed:", error.message);
-    process.exit(1);
+    throw error;
   }
 };
 
