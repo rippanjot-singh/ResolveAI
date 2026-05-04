@@ -9,96 +9,105 @@ const path = require("path");
 
 async function scrape(url) {
     let browser;
-    
-    if (config.NODE_ENV === 'production') {
-        console.log("[Scraper] Using production chromium settings...");
-        
-        // Force extraction to project folder because /tmp is often 'noexec' on shared hosts
-        const graphicsPath = path.join(process.cwd(), '.chromium-bin');
-        const executablePath = await chromium.executablePath(graphicsPath);
-        
-        browser = await puppeteerCore.launch({
-            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-            defaultViewport: chromium.defaultViewport,
-            executablePath: executablePath,
-            headless: chromium.headless,
-        });
-    } else {
-        console.log("[Scraper] Using local puppeteer settings...");
-        browser = await puppeteer.launch({
-            headless: "new",
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-    }
-
-    const page = await browser.newPage();
     let allData = "";
-    console.log("Scraping: " + url);
 
     try {
-        console.log("Attempting sitemap scrape: " + url + "/sitemap.xml");
-        
-        // PERFORMANCE: Try fetching sitemap with Axios first to avoid heavy browser load
-        let sitemap = "";
-        try {
-            const response = await axios.get(url + "/sitemap.xml", { timeout: 5000 });
-            sitemap = response.data;
-            console.log("[Scraper] Sitemap fetched successfully via Axios.");
-        } catch (e) {
-            console.log("[Scraper] Axios sitemap fetch failed, trying browser...");
-            await page.goto(url + "/sitemap.xml", {
-                waitUntil: "networkidle2",
-                timeout: 10000
+        if (config.NODE_ENV === 'production') {
+            console.log("[Scraper] Using production chromium settings...");
+            
+            // Attempt to force a local execution path
+            const graphicsPath = path.join(process.cwd(), '.chromium-bin');
+            const executablePath = await chromium.executablePath(graphicsPath);
+            
+            browser = await puppeteerCore.launch({
+                args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
+                defaultViewport: chromium.defaultViewport,
+                executablePath: executablePath,
+                headless: chromium.headless,
             });
-            sitemap = await page.content();
-        }
-
-        const $ = cheerio.load(sitemap, { xmlMode: true });
-        const urls = [];
-
-        $("loc").each((i, el) => {
-            if (urls.length >= 5) return false;
-            const link = $(el).text().trim();
-            if (link) urls.push(link);
-        });
-
-        if (urls.length > 0) {
-            console.log("Found sitemap URLs:", urls);
-            for (const sUrl of urls) {
-                console.log("Scraping page:", sUrl);
-                try {
-                    const text = await scrapePage(page, sUrl);
-                    allData += text + "\n";
-                } catch (e) {
-                    console.log(`Failed to scrape ${sUrl}: ${e.message}`);
-                }
-            }
         } else {
-            console.log("No URLs found in sitemap. Falling back to homepage.");
+            console.log("[Scraper] Using local puppeteer settings...");
+            browser = await puppeteer.launch({
+                headless: "new",
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
+            });
+        }
+
+        const page = await browser.newPage();
+        console.log("Scraping with Browser: " + url);
+
+        try {
+            console.log("Attempting sitemap scrape: " + url + "/sitemap.xml");
+            
+            let sitemap = "";
+            try {
+                const response = await axios.get(url + "/sitemap.xml", { timeout: 5000 });
+                sitemap = response.data;
+                console.log("[Scraper] Sitemap fetched via Axios.");
+            } catch (e) {
+                await page.goto(url + "/sitemap.xml", { waitUntil: "networkidle2", timeout: 10000 });
+                sitemap = await page.content();
+            }
+
+            const $ = cheerio.load(sitemap, { xmlMode: true });
+            const urls = [];
+            $("loc").each((i, el) => {
+                if (urls.length >= 5) return false;
+                const link = $(el).text().trim();
+                if (link) urls.push(link);
+            });
+
+            if (urls.length > 0) {
+                for (const sUrl of urls) {
+                    try {
+                        const text = await scrapePage(page, sUrl);
+                        allData += text + "\n";
+                    } catch (e) {
+                        console.log(`Failed browser scrape for ${sUrl}: ${e.message}`);
+                    }
+                }
+            } else {
+                const text = await scrapePage(page, url);
+                allData += text;
+            }
+        } catch (error) {
             const text = await scrapePage(page, url);
             allData += text;
         }
-    } catch (error) {
-        console.log("Sitemap search failed or timed out. Scraping homepage instead.");
+
+        await browser.close();
+
+    } catch (launchError) {
+        console.error("[Scraper] BROWSER LAUNCH FAILED. Falling back to Pure Node Scrape:", launchError.message);
+        
+        // --- PURE NODE FALLBACK (No Browser Required) ---
         try {
-            const text = await scrapePage(page, url);
-            allData += text;
-        } catch (e) {
-            console.log("Failed to scrape homepage:", e.message);
+            console.log("[Scraper] Fetching homepage with Axios...");
+            const response = await axios.get(url, { 
+                timeout: 10000,
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+            });
+            const $ = cheerio.load(response.data);
+            
+            // Basic text extraction from common tags
+            $('script, style, nav, footer, header').remove();
+            allData = $('body').text().replace(/\s+/g, ' ').trim();
+            console.log("[Scraper] Axios fallback successful. Length:", allData.length);
+        } catch (axiosError) {
+            console.error("[Scraper] Axios fallback also failed:", axiosError.message);
+            throw new Error("Website scraping failed: All methods exhausted.");
         }
     }
 
-
-    await browser.close();
+    if (!allData || allData.length < 50) {
+        throw new Error("Scraped data too short or empty.");
+    }
 
     await rag(allData, url);
-    
-    // Pinecone needs a few seconds to index the vectors before they are queryable
     console.log("Waiting for Pinecone to index...");
     await new Promise(resolve => setTimeout(resolve, 5000));
     
-    let data = await getReleventdata(url);
-    return data;
+    return await getReleventdata(url);
 }
 
 async function scrapePage(page, url) {
