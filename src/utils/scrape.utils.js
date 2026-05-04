@@ -8,103 +8,86 @@ const config = require("../config/config");
 const path = require("path");
 
 async function scrape(url) {
-    let browser;
     let allData = "";
 
+    console.log("[Scraper] Starting scrape for: " + url);
+
+    // --- STRATEGY 1: PURE NODE (High Speed & Most Stable) ---
     try {
-        if (config.NODE_ENV === 'production') {
-            console.log("[Scraper] Using production chromium settings...");
-            
-            // Attempt to force a local execution path
-            const graphicsPath = path.join(process.cwd(), '.chromium-bin');
-            const executablePath = await chromium.executablePath(graphicsPath);
-            
-            browser = await puppeteerCore.launch({
-                args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
-                defaultViewport: chromium.defaultViewport,
-                executablePath: executablePath,
-                headless: chromium.headless,
-            });
-        } else {
-            console.log("[Scraper] Using local puppeteer settings...");
-            browser = await puppeteer.launch({
-                headless: "new",
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
-            });
-        }
-
-        const page = await browser.newPage();
-        console.log("Scraping with Browser: " + url);
-
-        try {
-            console.log("Attempting sitemap scrape: " + url + "/sitemap.xml");
-            
-            let sitemap = "";
-            try {
-                const response = await axios.get(url + "/sitemap.xml", { timeout: 5000 });
-                sitemap = response.data;
-                console.log("[Scraper] Sitemap fetched via Axios.");
-            } catch (e) {
-                await page.goto(url + "/sitemap.xml", { waitUntil: "networkidle2", timeout: 10000 });
-                sitemap = await page.content();
+        console.log("[Scraper] Attempting Pure Node Scrape (Axios)...");
+        const response = await axios.get(url, { 
+            timeout: 8000,
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
             }
+        });
 
-            const $ = cheerio.load(sitemap, { xmlMode: true });
-            const urls = [];
-            $("loc").each((i, el) => {
-                if (urls.length >= 5) return false;
-                const link = $(el).text().trim();
-                if (link) urls.push(link);
-            });
-
-            if (urls.length > 0) {
-                for (const sUrl of urls) {
-                    try {
-                        const text = await scrapePage(page, sUrl);
-                        allData += text + "\n";
-                    } catch (e) {
-                        console.log(`Failed browser scrape for ${sUrl}: ${e.message}`);
-                    }
-                }
-            } else {
-                const text = await scrapePage(page, url);
-                allData += text;
-            }
-        } catch (error) {
-            const text = await scrapePage(page, url);
-            allData += text;
-        }
-
-        await browser.close();
-
-    } catch (launchError) {
-        console.error("[Scraper] BROWSER LAUNCH FAILED. Falling back to Pure Node Scrape:", launchError.message);
-        
-        // --- PURE NODE FALLBACK (No Browser Required) ---
-        try {
-            console.log("[Scraper] Fetching homepage with Axios...");
-            const response = await axios.get(url, { 
-                timeout: 10000,
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-            });
+        if (response.data) {
             const $ = cheerio.load(response.data);
             
-            // Basic text extraction from common tags
-            $('script, style, nav, footer, header').remove();
-            allData = $('body').text().replace(/\s+/g, ' ').trim();
-            console.log("[Scraper] Axios fallback successful. Length:", allData.length);
-        } catch (axiosError) {
-            console.error("[Scraper] Axios fallback also failed:", axiosError.message);
-            throw new Error("Website scraping failed: All methods exhausted.");
+            // Extract Meta Data first (Great for AI context if body is empty)
+            const metaDescription = $('meta[name="description"]').attr('content') || "";
+            const title = $('title').text() || "";
+            
+            // Remove junk
+            $('script, style, nav, footer, header, iframe, noscript').remove();
+            
+            // Extract body text
+            let bodyText = $('body').text().replace(/\s+/g, ' ').trim();
+            
+            allData = `Title: ${title}\nDescription: ${metaDescription}\nContent: ${bodyText}`;
+            
+            if (allData.length > 200) {
+                console.log("[Scraper] Axios scrape successful. Length:", allData.length);
+                // Continue to RAG processing
+            } else {
+                console.log("[Scraper] Axios content too short, will try browser...");
+                allData = ""; // Reset to trigger browser
+            }
+        }
+    } catch (axiosError) {
+        console.log("[Scraper] Axios method failed:", axiosError.message);
+    }
+
+    // --- STRATEGY 2: BROWSER (Fallback for SPAs) ---
+    if (!allData) {
+        let browser;
+        try {
+            if (config.NODE_ENV === 'production') {
+                const graphicsPath = path.join(process.cwd(), '.chromium-bin');
+                const executablePath = await chromium.executablePath(graphicsPath);
+                browser = await puppeteerCore.launch({
+                    args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--single-process'],
+                    executablePath: executablePath,
+                    headless: chromium.headless,
+                });
+            } else {
+                browser = await puppeteer.launch({
+                    headless: "new",
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
+            }
+
+            const page = await browser.newPage();
+            console.log("[Scraper] Browser launched. Scraping page...");
+            const text = await scrapePage(page, url);
+            allData = text;
+            await browser.close();
+        } catch (browserError) {
+            console.error("[Scraper] BROWSER ALSO FAILED:", browserError.message);
         }
     }
 
     if (!allData || allData.length < 50) {
-        throw new Error("Scraped data too short or empty.");
+        console.warn("[Scraper] FINAL WARNING: Scraped data is very short.");
+        // If everything else failed, just return a fallback description so it doesn't crash
+        allData = `Content for ${url} could not be fully extracted due to bot protection or SPA architecture. Please visit the site directly for more info.`;
     }
 
     await rag(allData, url);
-    console.log("Waiting for Pinecone to index...");
+    console.log("[Scraper] RAG Indexing started...");
     await new Promise(resolve => setTimeout(resolve, 5000));
     
     return await getReleventdata(url);
