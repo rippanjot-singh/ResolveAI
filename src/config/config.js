@@ -69,6 +69,8 @@ if (!process.env.REDIS_PASSWORD) {
     throw new Error("REDIS_PASSWORD is not defined in environment variables")
 }
 
+
+
 const config = {
     PORT: process.env.PORT || 8080,
     MONGO_URI: process.env.MONGO_URI,
@@ -88,7 +90,8 @@ const config = {
     NOTION_CLIENT_SECRET: process.env.NOTION_CLIENT_SECRET,
     REDIS_HOST: process.env.REDIS_HOST,
     REDIS_PORT: process.env.REDIS_PORT,
-    REDIS_PASSWORD: process.env.REDIS_PASSWORD
+    REDIS_PASSWORD: process.env.REDIS_PASSWORD,
+    NODE_ENV: process.env.NODE_ENV
 }
 
 module.exports = config

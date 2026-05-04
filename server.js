@@ -7,6 +7,12 @@ const socketUtil = require('./src/utils/socket.js');
 
 const { connectRedis } = require("./src/config/redis.js");
 
+
+if (config.NODE_ENV === 'production') {
+  console.log = () => { };
+  console.warn = () => { };
+}
+
 connectDB();
 connectRedis();
 startEmailPoller();
