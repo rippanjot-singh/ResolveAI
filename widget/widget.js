@@ -610,7 +610,7 @@
       status.style.display = 'none';
 
       try {
-        const res = await fetch(`${backendOrigin}/api/chat/ticket/`, {
+        const res = await fetch(`${backendOrigin}/api/chat/ticket`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email, inquiree, chatId })
@@ -688,7 +688,7 @@
       if (form) {
         const initChatHandler = async (data) => {
           try {
-            const res = await fetch(`${backendOrigin}/api/chat/init/`, {
+            const res = await fetch(`${backendOrigin}/api/chat/init`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(data)
@@ -774,7 +774,7 @@
 
     try {
       const currentUrl = encodeURIComponent(window.location.href);
-      const res = await fetch(`${backendOrigin}/api/ai/ask/${chatbotId}/?currentUrl=${currentUrl}`, {
+      const res = await fetch(`${backendOrigin}/api/ai/ask/${chatbotId}?currentUrl=${currentUrl}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: text, history: history.slice(0, -1), chatId })
@@ -827,7 +827,7 @@
 
     // Fetch config (apply styles after, re-render if window already open)
     const currentUrl = encodeURIComponent(window.location.href);
-    fetch(`${backendOrigin}/api/chatbot/config/${chatbotId}/?currentUrl=${currentUrl}`)
+    fetch(`${backendOrigin}/api/chatbot/config/${chatbotId}?currentUrl=${currentUrl}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
