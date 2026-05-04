@@ -11,6 +11,10 @@ function buildClient(emailSettings) {
             user: decrypt(emailSettings.User),
             pass: decrypt(emailSettings.Pass)
         },
+        connectionTimeout: 10000,
+        tls: {
+            rejectUnauthorized: false
+        },
         logger: false
     });
 }
