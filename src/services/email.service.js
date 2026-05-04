@@ -3,23 +3,27 @@ const dns = require("dns");
 const config = require("../config/config");
 const { decrypt } = require("../utils/crypto.utils");
 
+const smtpPort = parseInt(config.SMTP_PORT) || 465;
+const isSecure = smtpPort === 465;
+
 const defaultTransporter = nodemailer.createTransport({
   host: config.SMTP_HOST,
-  port: parseInt(config.SMTP_PORT) || 465,
+  port: smtpPort,
   family: 4,
-  secure: true,
+  secure: isSecure,
   auth: {
     user: config.EMAIL_USER,
     pass: config.EMAIL_PASS,
   },
-  connectionTimeout: 10000, // 10 seconds
+  connectionTimeout: 10000,
   greetingTimeout: 10000,
   socketTimeout: 15000,
   dnsLookup: (hostname, options, callback) => {
     dns.lookup(hostname, { family: 4 }, callback);
   },
   tls: {
-    rejectUnauthorized: false, // Helps with some cloud hosting certificate issues
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
   },
 });
 
@@ -30,11 +34,14 @@ async function sendMail(to, subject, text, html, userEmailConfig = null) {
 
     // Use user-specific SMTP if provided
     if (userEmailConfig && userEmailConfig.SmtpHost && userEmailConfig.User && userEmailConfig.Pass) {
+      const userPort = parseInt(userEmailConfig.SmtpPort) || 465;
+      const userSecure = userPort === 465;
+
       transporter = nodemailer.createTransport({
         host: decrypt(userEmailConfig.SmtpHost),
-        port: parseInt(userEmailConfig.SmtpPort) || 465,
+        port: userPort,
         family: 4,
-        secure: true,
+        secure: userSecure,
         auth: {
           user: decrypt(userEmailConfig.User),
           pass: decrypt(userEmailConfig.Pass),
@@ -47,6 +54,7 @@ async function sendMail(to, subject, text, html, userEmailConfig = null) {
         },
         tls: {
           rejectUnauthorized: false,
+          minVersion: 'TLSv1.2'
         },
       });
       fromEmail = decrypt(userEmailConfig.SupportEmail) || decrypt(userEmailConfig.User);
