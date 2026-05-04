@@ -14,7 +14,7 @@ const {
 } = require('../controllers/notion.controller');
 
 router.get('/auth-url', authMiddleware, getNotionAuthUrl);
-router.get('/callback', authMiddleware, notionCallback);
+router.get('/callback', notionCallback);
 router.get('/status', authMiddleware, getNotionStatus);
 router.get('/pages', authMiddleware, listNotionPages);
 router.post('/integrate', authMiddleware, addNotionIntegration);

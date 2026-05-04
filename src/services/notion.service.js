@@ -7,8 +7,8 @@ const NOTION_CLIENT_SECRET = config.NOTION_CLIENT_SECRET;
 const REDIRECT_URI = `${config.BACKEND_URL}/api/notion/callback`;
 
 class NotionService {
-    getAuthUrl() {
-        return `https://api.notion.com/v1/oauth/authorize?client_id=${NOTION_CLIENT_ID}&response_type=code&owner=user&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+    getAuthUrl(state) {
+        return `https://api.notion.com/v1/oauth/authorize?client_id=${NOTION_CLIENT_ID}&response_type=code&owner=user&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
     }
 
     async exchangeCodeForToken(code) {

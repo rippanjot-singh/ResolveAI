@@ -3,7 +3,8 @@ const notionService = require('../services/notion.service');
 
 async function getNotionAuthUrl(req, res) {
     try {
-        const authUrl = notionService.getAuthUrl();
+        const state = req.user.companyId; // Pass companyId as state
+        const authUrl = notionService.getAuthUrl(state);
         return res.status(200).json({ success: true, authUrl });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
@@ -19,8 +20,9 @@ async function notionCallback(req, res) {
 
         const notionData = await notionService.exchangeCodeForToken(code);
         
-        const companyId = req.user?.companyId || req.companyId; 
-        const userId = req.user?.userId || req.userId;
+        // Use state (companyId) if session cookie is missing during redirect
+        const companyId = req.user?.companyId || req.query.state; 
+        const userId = req.user?.userId;
 
         if (!companyId) {
             console.error('Notion Callback: No company ID found in request');
