@@ -1,12 +1,29 @@
 const puppeteer = require("puppeteer");
+const puppeteerCore = require("puppeteer-core");
+const chromium = require("@sparticuz/chromium");
 const cheerio = require("cheerio");
 const { rag, getReleventdata } = require("../services/rag.service");
+const config = require("../config/config");
 
 async function scrape(url) {
-    const browser = await puppeteer.launch({
-        headless: "new",
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+    let browser;
+    
+    if (config.NODE_ENV === 'production') {
+        console.log("[Scraper] Using production chromium settings...");
+        browser = await puppeteerCore.launch({
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+        });
+    } else {
+        console.log("[Scraper] Using local puppeteer settings...");
+        browser = await puppeteer.launch({
+            headless: "new",
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
+        });
+    }
+
     const page = await browser.newPage();
     let allData = "";
     console.log("Scraping: " + url);
