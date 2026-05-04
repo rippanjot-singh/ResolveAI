@@ -29,12 +29,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.use(express.static(path.join(__dirname, "..", "public")));
-app.use("/widget", express.static(path.join(__dirname, "..", "widget")));
 
-// app.get("*name", (req, res) => {
-//     res.sendFile(path.join(__dirname, "..", "public", "index.html"));
-// });
 
 app.use('/api/auth', authRoutes)
 app.use('/api/ai', aiRoutes);
@@ -48,5 +43,13 @@ app.use('/api/notion', notionRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/leads', leadRoutes);
 app.use('/api/email', emailRoutes);
+
+app.use(express.static(path.join(__dirname, "..", "public")));
+app.use("/widget", express.static(path.join(__dirname, "..", "widget")));
+
+app.get("*name", (req, res) => {
+    res.sendFile(path.join(__dirname, "..", "public", "index.html"));
+});
+
 
 module.exports = app;
