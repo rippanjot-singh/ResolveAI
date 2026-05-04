@@ -2,18 +2,25 @@ const puppeteer = require("puppeteer");
 const puppeteerCore = require("puppeteer-core");
 const chromium = require("@sparticuz/chromium");
 const cheerio = require("cheerio");
+const axios = require("axios");
 const { rag, getReleventdata } = require("../services/rag.service");
 const config = require("../config/config");
+const path = require("path");
 
 async function scrape(url) {
     let browser;
     
     if (config.NODE_ENV === 'production') {
         console.log("[Scraper] Using production chromium settings...");
+        
+        // Force extraction to project folder because /tmp is often 'noexec' on shared hosts
+        const graphicsPath = path.join(process.cwd(), '.chromium-bin');
+        const executablePath = await chromium.executablePath(graphicsPath);
+        
         browser = await puppeteerCore.launch({
-            args: chromium.args,
+            args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
             defaultViewport: chromium.defaultViewport,
-            executablePath: await chromium.executablePath(),
+            executablePath: executablePath,
             headless: chromium.headless,
         });
     } else {
@@ -30,12 +37,22 @@ async function scrape(url) {
 
     try {
         console.log("Attempting sitemap scrape: " + url + "/sitemap.xml");
-        await page.goto(url + "/sitemap.xml", {
-            waitUntil: "networkidle2",
-            timeout: 10000
-        });
+        
+        // PERFORMANCE: Try fetching sitemap with Axios first to avoid heavy browser load
+        let sitemap = "";
+        try {
+            const response = await axios.get(url + "/sitemap.xml", { timeout: 5000 });
+            sitemap = response.data;
+            console.log("[Scraper] Sitemap fetched successfully via Axios.");
+        } catch (e) {
+            console.log("[Scraper] Axios sitemap fetch failed, trying browser...");
+            await page.goto(url + "/sitemap.xml", {
+                waitUntil: "networkidle2",
+                timeout: 10000
+            });
+            sitemap = await page.content();
+        }
 
-        const sitemap = await page.content();
         const $ = cheerio.load(sitemap, { xmlMode: true });
         const urls = [];
 
