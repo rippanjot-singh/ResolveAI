@@ -15,7 +15,7 @@ if (config.NODE_ENV === 'production') {
 
 connectDB();
 connectRedis();
-startEmailPoller();
+// startEmailPoller();
 
 const server = http.createServer(app);
 socketUtil.init(server);

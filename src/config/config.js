@@ -68,7 +68,9 @@ if (!process.env.REDIS_PORT) {
 if (!process.env.REDIS_PASSWORD) {
     throw new Error("REDIS_PASSWORD is not defined in environment variables")
 }
-
+if (!process.env.RESEND_API_KEY) {
+    throw new Error("RESEND_API_KEY is not defined in environment variables")
+}
 
 
 const config = {
@@ -94,7 +96,8 @@ const config = {
     NODE_ENV: process.env.NODE_ENV,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI
+    GOOGLE_REDIRECT_URI: process.env.GOOGLE_REDIRECT_URI,
+    RESEND_API_KEY: process.env.RESEND_API_KEY
 }
 
 module.exports = config
